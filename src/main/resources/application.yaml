@@ -19,7 +19,7 @@ telegram:
       isEnabled: false
       path: sendVideo
   bot:
-    token: 7594207591:AAF2IYjyAKb8eRPIvBEao050QW3P0ALhSXA
+    token:
   group:
     - chatID: "-4871935676"
     - chatID: "8146034511"
