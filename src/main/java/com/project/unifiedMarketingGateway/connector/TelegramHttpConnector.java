@@ -12,7 +12,7 @@ import java.util.Map;
 @Service
 public class TelegramHttpConnector implements ConnectorInterface{
 
-    @Value("${telegram.bot.token}")
+    @Value("${telegram.bot.token:defaultToken}")
     private String botToken;
 
     private final WebClient webClient;
