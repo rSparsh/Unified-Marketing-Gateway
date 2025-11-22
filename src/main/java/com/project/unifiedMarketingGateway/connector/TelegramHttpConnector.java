@@ -1,7 +1,6 @@
 package com.project.unifiedMarketingGateway.connector;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -32,7 +31,7 @@ public class TelegramHttpConnector implements ConnectorInterface{
                 .retrieve()
                 .bodyToMono(String.class)
                 .doOnSuccess(body -> log.debug("Telegram {} success (resp length={})", method, body == null ? 0 : body.length()))
-                .doOnError(e -> log.warn("Telegram {} error for payload {} : {}", method, payload, e.toString()));
+                .doOnError(e -> log.error("Telegram {} error for payload {} : {}", method, payload, e.toString()));
     }
 
     private String apiPath(String method) {

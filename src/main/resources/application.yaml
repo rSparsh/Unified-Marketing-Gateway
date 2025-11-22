@@ -1,6 +1,8 @@
 spring:
   application:
     name: Unified-Marketing-Gateway
+  config:
+    import: "optional:classpath:application-secrets.yaml"
 
 telegram:
   baseUrl: https://api.telegram.org
@@ -18,8 +20,6 @@ telegram:
     video:
       isEnabled: false
       path: sendVideo
-  bot:
-    token:
   group:
     - chatID: "-4871935676"
     - chatID: "8146034511"

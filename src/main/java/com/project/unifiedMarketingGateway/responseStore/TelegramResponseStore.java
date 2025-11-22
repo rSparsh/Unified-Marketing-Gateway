@@ -21,16 +21,16 @@ public class TelegramResponseStore {
         log.info("Stored response for {} (len={})", recipientId, responseBody == null ? 0 : responseBody.length());
     }
 
-    public Optional<String> getResponse(String recipientId) {
-        return Optional.ofNullable(responses.get(recipientId));
-    }
+    //TODO: use to provide response status for chat-id
+//    public Optional<String> getResponse(String recipientId) {
+//        return Optional.ofNullable(responses.get(recipientId));
+//    }
 
-    // for persistence in background (optional)
-    @Async("telegramExecutor")
-    public void persistResponseAsync(String recipientId, String responseBody) {
-        // replace with actual persistence logic (DB call, audit log, etc.)
-        log.info("Persisting response for {} in background", recipientId);
-        // persistenceRepo.save(...);
-    }
+    //TODO: persist the responses in bigQuery or some other dataLake
+//    @Async("telegramExecutor")
+//    public void persistResponseAsync(String recipientId, String responseBody) {
+//        // we can replace with actual persistence logic (DB call, audit log, etc.)
+//        log.info("Persisting response for {} in background", recipientId);
+//    }
 }
 
