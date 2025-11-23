@@ -1,6 +1,6 @@
 package com.project.unifiedMarketingGateway.processor.telegram;
 
-import com.project.unifiedMarketingGateway.connector.TelegramHttpConnector;
+import com.project.unifiedMarketingGateway.connectors.TelegramHttpConnector;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
@@ -81,11 +81,6 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
 
     private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage)
     {
-        if (recipientList == null || recipientList.isEmpty()) {
-            log.warn("No recipients to send to");
-            return false;
-        }
-
         Flux.fromIterable(recipientList)
                 .map(String::trim)
                 .filter(id -> !id.isEmpty())
@@ -116,11 +111,6 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
 
     private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption)
     {
-        if (recipientList == null || recipientList.isEmpty()) {
-            log.warn("No recipients to send to");
-            return false;
-        }
-
         Flux.fromIterable(recipientList)
                 .map(String::trim)
                 .filter(id -> !id.isEmpty())
@@ -154,11 +144,6 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
 
     private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption)
     {
-        if (recipientList == null || recipientList.isEmpty()) {
-            log.warn("No recipients to send to");
-            return false;
-        }
-
         Flux.fromIterable(recipientList)
                 .map(String::trim)
                 .filter(id -> !id.isEmpty())

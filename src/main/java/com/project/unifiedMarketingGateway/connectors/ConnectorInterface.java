@@ -1,4 +1,4 @@
-package com.project.unifiedMarketingGateway.connector;
+package com.project.unifiedMarketingGateway.connectors;
 
 import reactor.core.publisher.Mono;
 
