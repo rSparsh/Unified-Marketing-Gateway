@@ -2,6 +2,7 @@ package com.project.unifiedMarketingGateway.connectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -27,11 +28,10 @@ public class TelegramHttpConnector implements ConnectorInterface{
     public Mono<String> sendMarketingRequest(String method, Map<String, Object> payload) {
         return webClient.post()
                 .uri(apiPath(method))
+                .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
                 .retrieve()
-                .bodyToMono(String.class)
-                .doOnSuccess(body -> log.debug("Telegram {} success (resp length={})", method, body == null ? 0 : body.length()))
-                .doOnError(e -> log.error("Telegram {} error for payload {} : {}", method, payload, e.toString()));
+                .bodyToMono(String.class);
     }
 
     private String apiPath(String method) {

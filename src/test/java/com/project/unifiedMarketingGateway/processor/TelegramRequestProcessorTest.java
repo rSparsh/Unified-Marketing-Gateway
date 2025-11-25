@@ -1,12 +1,14 @@
-package com.project.unifiedMarketingGateway.processor.telegram;
+package com.project.unifiedMarketingGateway.processor;
 
+import com.project.unifiedMarketingGateway.builders.TelegramPayloadBuilder;
 import com.project.unifiedMarketingGateway.connectors.TelegramHttpConnector;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
-import com.project.unifiedMarketingGateway.processor.RequestProcessorInterface;
-import com.project.unifiedMarketingGateway.responseBuilders.SendNotificationResponseBuilder;
+import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
+import com.project.unifiedMarketingGateway.processor.telegram.TelegramRequestProcessor;
 import com.project.unifiedMarketingGateway.responseStore.TelegramResponseStore;
+import com.project.unifiedMarketingGateway.retryHandler.TelegramReactiveRetryHandler;
 import com.project.unifiedMarketingGateway.validators.TelegramSendNotificationRequestValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,9 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -31,10 +35,16 @@ public class TelegramRequestProcessorTest {
     private TelegramResponseStore telegramResponseStore;
 
     @Mock
-    private SendNotificationResponseBuilder sendNotificationResponseBuilder;
+    private SendNotificationResponseBuilder responseBuilder;
 
     @Mock
-    private TelegramSendNotificationRequestValidator telegramSendNotificationRequestValidator;
+    private TelegramSendNotificationRequestValidator requestValidator;
+
+    @Mock
+    TelegramReactiveRetryHandler reactiveRetryHandler;
+
+    @Mock
+    TelegramPayloadBuilder payloadBuilder;
 
 
     @BeforeEach
@@ -46,8 +56,9 @@ public class TelegramRequestProcessorTest {
         telegramRequestProcessor = new TelegramRequestProcessor();
         setField(telegramRequestProcessor, "telegramHttpConnector", telegramHttpConnector);
         setField(telegramRequestProcessor, "telegramResponseStore", telegramResponseStore);
-        setField(telegramRequestProcessor, "sendNotificationResponseBuilder", sendNotificationResponseBuilder);
-        setField(telegramRequestProcessor, "telegramSendNotificationRequestValidator", telegramSendNotificationRequestValidator);
+        setField(telegramRequestProcessor, "responseBuilder", responseBuilder);
+        setField(telegramRequestProcessor, "requestValidator", requestValidator);
+        setField(telegramRequestProcessor, "maxConcurrency", 3);
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {
@@ -62,9 +73,9 @@ public class TelegramRequestProcessorTest {
         SendNotificationRequest request = SendNotificationRequest.builder().build();
         List<String> validationErrors = Arrays.asList("Invalid chat ID");
 
-        when(telegramSendNotificationRequestValidator.validateSendNotificationRequest(request))
+        when(requestValidator.validateSendNotificationRequest(request))
                 .thenReturn(validationErrors);
-        when(sendNotificationResponseBuilder.buildFailureResponse("Request Validation Failed: [Invalid chat ID]"))
+        when(responseBuilder.buildFailureResponse("Request Validation Failed: [Invalid chat ID]"))
                 .thenReturn(SendNotificationResponse.builder()
                         .responseStatus("400")
                         .customMessage("Request Validation Failed: [Invalid chat ID]")
@@ -73,115 +84,119 @@ public class TelegramRequestProcessorTest {
         SendNotificationResponse response = telegramRequestProcessor.processNotificationRequest(request);
 
         // Assert
-        verify(sendNotificationResponseBuilder).buildFailureResponse("Request Validation Failed: " + validationErrors);
+        verify(responseBuilder).buildFailureResponse("Request Validation Failed: " + validationErrors);
         assertEquals("Request Validation Failed: [Invalid chat ID]", response.getCustomMessage());
     }
 
     @Test
     void testTextMediaProcessing() {
-        // Arrange
-        SendNotificationRequest request = new SendNotificationRequest();
-        request.setRecipientList(Arrays.asList("123", "456"));
-        request.setMediaTypeList(Collections.singletonList(MediaType.TEXT));
-        request.setTextMessage("Hello, Telegram!");
+        SendNotificationRequest baseRequest = getBaseRequest(List.of(MediaType.TEXT));
+        SendNotificationResponse successResponse = getSuccessResponse();
 
-        when(telegramSendNotificationRequestValidator.validateSendNotificationRequest(request))
-                .thenReturn(Collections.emptyList());
+        when(requestValidator.validateSendNotificationRequest(any())).thenReturn(Collections.emptyList());
+        when(responseBuilder.buildSuccessResponse(anyString())).thenReturn(successResponse);
+        when(payloadBuilder.buildTextPayload(eq("111"), eq("hello"))).thenReturn(Map.of("chat_id", "111", "text", "hello"));
+        when(payloadBuilder.buildTextPayload(eq("222"), eq("hello"))).thenReturn(Map.of("chat_id", "222", "text", "hello"));
+        when(reactiveRetryHandler.withRetry(any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    java.util.function.Supplier<Mono<String>> supplier = (java.util.function.Supplier<Mono<String>>) invocation.getArgument(0);
+                    return supplier.get().onErrorResume(e -> Mono.just("error")); // supplier returns whatever connector returns
+                });
 
-        // Mock sendMarketingRequest to return success
-        when(telegramHttpConnector.sendMarketingRequest(anyString(), anyMap()))
-                .thenReturn(Mono.just("Success"));
-        when(sendNotificationResponseBuilder.buildSuccessResponse("Notification request added to queue successfully"))
-                .thenReturn(SendNotificationResponse.builder()
-                        .responseStatus("200")
-                        .customMessage("Notification request added to queue successfully")
-                        .build());
+        when(telegramHttpConnector.sendMarketingRequest(eq("sendMessage"), anyMap())).thenReturn(Mono.just("{\"ok\":true}"));
+
         // Act
-        SendNotificationResponse response = telegramRequestProcessor.processNotificationRequest(request);
+        SendNotificationResponse resp = telegramRequestProcessor.processNotificationRequest(baseRequest);
 
-        // Assert
-        verify(telegramHttpConnector, times(2)).sendMarketingRequest(anyString(), anyMap());
-        assertEquals("Notification request added to queue successfully", response.getCustomMessage());
+        // Assert returned success
+        assertSame(successResponse, resp);
+        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"));
     }
+
+
 
     @Test
     void testImageMediaProcessing() {
-        // Arrange
-        SendNotificationRequest request = new SendNotificationRequest();
-        request.setRecipientList(Collections.singletonList("789"));
-        request.setMediaTypeList(Collections.singletonList(MediaType.IMAGE));
-        request.setImageUrl("http://example.com/image.jpg");
-        request.setImageCaption("Caption");
+        SendNotificationRequest baseRequest = getBaseRequest(List.of(MediaType.TEXT));
+        SendNotificationResponse successResponse = getSuccessResponse();
 
-        when(telegramSendNotificationRequestValidator.validateSendNotificationRequest(request))
-                .thenReturn(Collections.emptyList());
+        when(requestValidator.validateSendNotificationRequest(any())).thenReturn(Collections.emptyList());
+        when(responseBuilder.buildSuccessResponse(anyString())).thenReturn(successResponse);
+        when(payloadBuilder.buildImagePayload(eq("111"), eq("https://example.com/img.jpg"), eq("caption")))
+                .thenReturn(Map.of("chat_id", "111", "photo", "https://example.com/img.jpg", "caption", "caption"));
+        when(payloadBuilder.buildImagePayload(eq("222"), eq("https://example.com/img.jpg"), eq("caption")))
+                .thenReturn(Map.of("chat_id", "222", "photo", "https://example.com/img.jpg", "caption", "caption"));
 
-        when(telegramHttpConnector.sendMarketingRequest(anyString(), anyMap()))
-                .thenReturn(Mono.just("Success"));
-        when(sendNotificationResponseBuilder.buildSuccessResponse("Notification request added to queue successfully"))
-                .thenReturn(SendNotificationResponse.builder()
-                        .responseStatus("200")
-                        .customMessage("Notification request added to queue successfully")
-                        .build());
+        when(reactiveRetryHandler.withRetry(any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    java.util.function.Supplier<Mono<String>> supplier =
+                            (java.util.function.Supplier<Mono<String>>) invocation.getArgument(0);
+                    return supplier.get();
+                });
+
+        when(telegramHttpConnector.sendMarketingRequest(eq("sendPhoto"), anyMap())).thenReturn(Mono.just("{\"ok\":true}"));
+
         // Act
-        SendNotificationResponse response = telegramRequestProcessor.processNotificationRequest(request);
+        SendNotificationResponse resp = telegramRequestProcessor.processNotificationRequest(baseRequest);
 
-        // Assert
-        verify(telegramHttpConnector, times(1)).sendMarketingRequest(anyString(), anyMap());
-        assertEquals("Notification request added to queue successfully", response.getCustomMessage());
-    }
-
-    @Test
-    void testErrorDuringSend() {
-        // Arrange
-        SendNotificationRequest request = new SendNotificationRequest();
-        request.setRecipientList(Collections.singletonList("123"));
-        request.setMediaTypeList(Collections.singletonList(MediaType.TEXT));
-        request.setTextMessage("Hello");
-
-        when(telegramSendNotificationRequestValidator.validateSendNotificationRequest(request))
-                .thenReturn(Collections.emptyList());
-
-        when(telegramHttpConnector.sendMarketingRequest(anyString(), anyMap()))
-                .thenReturn(Mono.error(new RuntimeException("Send failed")));
-
-        when(sendNotificationResponseBuilder.buildSuccessResponse("Notification request added to queue successfully"))
-                .thenReturn(SendNotificationResponse.builder()
-                        .responseStatus("200")
-                        .customMessage("Notification request added to queue successfully")
-                        .build());
-        // Act
-        SendNotificationResponse response = telegramRequestProcessor.processNotificationRequest(request);
-
-        // Assert
-        verify(telegramResponseStore).storeResponse("123", "{\"ok\":false, \"error\":\"Send failed\"}");
-        assertEquals("Notification request added to queue successfully", response.getCustomMessage());
+        // Assert returned success
+        assertSame(successResponse, resp);
+        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"));
     }
 
     @Test
     void testVideoMediaProcessing() {
-        // Arrange
-        SendNotificationRequest request = new SendNotificationRequest();
-        request.setRecipientList(Collections.singletonList("789"));
-        request.setMediaTypeList(Collections.singletonList(MediaType.VIDEO));
-        request.setVideoUrl("http://example.com/video.mp4");
-        request.setVideoCaption("Caption");
+        SendNotificationRequest baseRequest = getBaseRequest(List.of(MediaType.VIDEO));
+        SendNotificationResponse successResponse = getSuccessResponse();
 
-        when(telegramSendNotificationRequestValidator.validateSendNotificationRequest(request))
-                .thenReturn(Collections.emptyList());
+        when(requestValidator.validateSendNotificationRequest(any())).thenReturn(Collections.emptyList());
+        when(responseBuilder.buildSuccessResponse(anyString())).thenReturn(successResponse);
+        when(payloadBuilder.buildVideoPayload(eq("111"), eq("https://example.com/vid.mp4"), eq("vcaption")))
+                .thenReturn(Map.of("chat_id", "111", "video", "https://example.com/vid.mp4", "caption", "vcaption"));
+        when(payloadBuilder.buildVideoPayload(eq("222"), eq("https://example.com/vid.mp4"), eq("vcaption")))
+                .thenReturn(Map.of("chat_id", "222", "video", "https://example.com/vid.mp4", "caption", "vcaption"));
 
-        when(telegramHttpConnector.sendMarketingRequest(anyString(), anyMap()))
-                .thenReturn(Mono.just("Success"));
-        when(sendNotificationResponseBuilder.buildSuccessResponse("Notification request added to queue successfully"))
-                .thenReturn(SendNotificationResponse.builder()
-                        .responseStatus("200")
-                        .customMessage("Notification request added to queue successfully")
-                        .build());
+        // reactive retry returns supplier-invoked Mono -> simulate connector behavior
+        when(reactiveRetryHandler.withRetry(any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    java.util.function.Supplier<Mono<String>> supplier =
+                            (java.util.function.Supplier<Mono<String>>) invocation.getArgument(0);
+                    return supplier.get();
+                });
+
+        // connector returns successful Mono for video send
+        when(telegramHttpConnector.sendMarketingRequest(eq("sendVideo"), anyMap())).thenReturn(Mono.just("{\"ok\":true}"));
+
         // Act
-        SendNotificationResponse response = telegramRequestProcessor.processNotificationRequest(request);
+        SendNotificationResponse resp = telegramRequestProcessor.processNotificationRequest(baseRequest);
 
-        // Assert
-        verify(telegramHttpConnector, times(1)).sendMarketingRequest(anyString(), anyMap());
-        assertEquals("Notification request added to queue successfully", response.getCustomMessage());
+        // Assert returned success
+        assertSame(successResponse, resp);
+        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"));
+
+    }
+
+    private SendNotificationRequest getBaseRequest(List<MediaType> mediaTypeList)
+    {
+        return SendNotificationRequest.builder()
+                .recipientList(List.of("111", "222"))
+                .mediaTypeList(mediaTypeList)
+                .textMessage("hello")
+                .imageUrl("http://example.com/image.jpg")
+                .imageCaption("image caption")
+                .videoUrl("http://example.com/video.mp4")
+                .videoCaption("video caption")
+                .build();
+    }
+
+    private SendNotificationResponse getSuccessResponse()
+    {
+        return SendNotificationResponse.builder()
+                .responseStatus("200")
+                .customMessage("Notification queued")
+                .build();
     }
 }

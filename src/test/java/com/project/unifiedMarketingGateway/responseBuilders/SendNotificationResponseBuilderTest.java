@@ -1,5 +1,6 @@
 package com.project.unifiedMarketingGateway.responseBuilders;
 
+import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
 import org.junit.jupiter.api.Test;
 
