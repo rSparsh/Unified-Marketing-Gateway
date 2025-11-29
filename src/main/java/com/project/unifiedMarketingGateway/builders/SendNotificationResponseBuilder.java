@@ -1,4 +1,4 @@
-package com.project.unifiedMarketingGateway.responseBuilders;
+package com.project.unifiedMarketingGateway.builders;
 
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
 import org.springframework.stereotype.Service;

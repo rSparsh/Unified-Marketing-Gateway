@@ -6,6 +6,7 @@ spring:
 
 telegram:
   baseUrl: https://api.telegram.org
+  maxConcurrency: 8
   contentBasedResource:
     text:
       isEnabled: true
@@ -24,4 +25,8 @@ telegram:
     - chatID: "-4871935676"
     - chatID: "8146034511"
     - chatID: "7642285695"
+  retry:
+    maxRetryCount: 4
+    initialBackoff: 1
+    maxBackoff: 30
 

@@ -1,26 +1,30 @@
 package com.project.unifiedMarketingGateway.processor.telegram;
 
+import com.project.unifiedMarketingGateway.builders.TelegramPayloadBuilder;
 import com.project.unifiedMarketingGateway.connectors.TelegramHttpConnector;
+import com.project.unifiedMarketingGateway.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
 import com.project.unifiedMarketingGateway.processor.RequestProcessorInterface;
-import com.project.unifiedMarketingGateway.responseBuilders.SendNotificationResponseBuilder;
+import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
 import com.project.unifiedMarketingGateway.responseStore.TelegramResponseStore;
+import com.project.unifiedMarketingGateway.retryHandler.TelegramReactiveRetryHandler;
 import com.project.unifiedMarketingGateway.validators.TelegramSendNotificationRequestValidator;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
-import static com.project.unifiedMarketingGateway.enums.MediaType.TEXT;
 
 @Slf4j
 @Service
@@ -33,18 +37,28 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     TelegramResponseStore telegramResponseStore;
 
     @Autowired
-    SendNotificationResponseBuilder sendNotificationResponseBuilder;
+    SendNotificationResponseBuilder responseBuilder;
 
     @Autowired
-    TelegramSendNotificationRequestValidator telegramSendNotificationRequestValidator;
+    TelegramSendNotificationRequestValidator requestValidator;
 
-    private final int concurrency = 8;
+    @Autowired
+    TelegramReactiveRetryHandler reactiveRetryHandler;
+
+    @Autowired
+    TelegramPayloadBuilder payloadBuilder;
+
+    @Value("${telegram.maxConcurrency:5}")
+    private int maxConcurrency;
+
+//    private record SendResult(String chatId, boolean success, String responseBody, String errorMessage) {}
 
     @Override
     public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest sendNotificationRequest) {
-        List<String> validationErrorList = telegramSendNotificationRequestValidator.validateSendNotificationRequest(sendNotificationRequest);
-        if(!validationErrorList.isEmpty())
-            return sendNotificationResponseBuilder.buildFailureResponse("Request Validation Failed: " + validationErrorList.toString());
+        List<String> validationErrorList = requestValidator.validateSendNotificationRequest(sendNotificationRequest);
+        if (!validationErrorList.isEmpty()) {
+            return responseBuilder.buildFailureResponse("Request Validation Failed: " + validationErrorList.toString());
+        }
 
         List<String> recipientList = sendNotificationRequest.getRecipientList();
         List<MediaType> mediaTypeList = sendNotificationRequest.getMediaTypeList();
@@ -55,124 +69,95 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         String videoUrl = sendNotificationRequest.getVideoUrl();
         String videoCaption = sendNotificationRequest.getVideoCaption();
 
-        AtomicBoolean operationStatus = new AtomicBoolean(true);
+        boolean allQueued = true;
 
-        mediaTypeList.stream().forEach(
-                mediaType -> {
-                    switch(mediaType){
-                        case TEXT:
-                            boolean ok = prepareAndSendTextMedia(recipientList, textMessage);
-                            operationStatus.set(operationStatus.get() && ok); break;
-                        case IMAGE:
-                            ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
-                            operationStatus.set(operationStatus.get() && ok); break;
-                        case VIDEO:
-                            ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
-                            operationStatus.set(operationStatus.get() && ok); break;
+        // iterate media types and queue work (synchronous control only indicates queuing success)
+        for (MediaType mediaType : mediaTypeList) {
+            boolean ok;
+            switch (mediaType) {
+                case TEXT -> ok = prepareAndSendTextMedia(recipientList, textMessage);
+                case IMAGE -> ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
+                case VIDEO -> ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
+                default -> ok = false;
+            }
+            allQueued = allQueued && ok;
+        }
+
+        if (allQueued) {
+            return responseBuilder.buildSuccessResponse("Notification request added to queue successfully");
+        } else {
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed.");
+        }
+    }
+
+    private boolean prepareAndSendMedia(List<String> recipientList,
+            Function<String, Map<String, Object>> payloadForChat,
+            String method) {
+        int concurrency = Math.min(maxConcurrency, recipientList.size());
+
+        Flux.fromIterable(recipientList)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .flatMap(chatId -> {
+                    Map<String, Object> payload = payloadForChat.apply(chatId);
+                    return executeRequestReactive(chatId, payload, method);
+                }, concurrency)
+                .doOnSubscribe(s -> log.info("Dispatching {} sends (method={} concurrency={})",
+                        recipientList.size(), method, concurrency))
+                .subscribe(
+                        result -> {
+                            if (result.isSuccess()) {
+                                log.info("[{}] sent successfully", result.getChatId());
+                            } else {
+                                log.warn("[{}] failed: {}", result.getChatId(), result.getErrorMessage());
+                            }
+                        },
+                        err -> log.error("Reactive pipeline error (should not cancel others): {}", err.toString()),
+                        () -> log.info("All send requests dispatched for method {}", method)
+                );
+
+        return true;
+    }
+
+    private Mono<SendResultDTO> executeRequestReactive(String chatId, Map<String, Object> payload, String method) {
+        Mono<String> httpCall = reactiveRetryHandler.withRetry(() -> telegramHttpConnector.sendMarketingRequest(method, payload));
+
+        return httpCall
+                .publishOn(Schedulers.boundedElastic()) // offload blocking store to boundedElastic
+                .map(body -> {
+                    try {
+                        telegramResponseStore.storeResponse(chatId, body);
+                    } catch (Exception e) {
+                        log.warn("[{}] failed to persist success response: {}", chatId, e.toString());
                     }
-                }
-        );
-
-        if(operationStatus.get())
-            return sendNotificationResponseBuilder.buildSuccessResponse("Notification request added to queue successfully");
-        else
-            return sendNotificationResponseBuilder.buildFailureResponse("Notification request couldn't be processed.");
+                    return new SendResultDTO(chatId, true, body, null);
+                })
+                .onErrorResume(err -> {
+                    String msg = err.getMessage() == null ? err.toString() : err.getMessage();
+                    try {
+                        telegramResponseStore.storeResponse(chatId, "{\"ok\":false,\"error\":\"" + msg + "\"}");
+                    } catch (Exception e) {
+                        log.warn("[{}] failed to persist error response: {}", chatId, e.toString());
+                    }
+                    return Mono.just(new SendResultDTO(chatId, false, null, msg));
+                });
     }
 
-    private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage)
-    {
-        Flux.fromIterable(recipientList)
-                .map(String::trim)
-                .filter(id -> !id.isEmpty())
-                .map(id -> Map.<String, Object>of(CHAT_ID, id, String.valueOf(TEXT).toLowerCase(), textMessage))
-                .flatMap(payload -> {
-                    String recipientId = String.valueOf(payload.get(CHAT_ID));
-                    return telegramHttpConnector.sendMarketingRequest(TELEGRAM_SEND_MESSAGE_METHOD, payload)
-                            .doOnNext(resp -> {
-                                telegramResponseStore.storeResponse(recipientId, resp);
-                                //TODO: add data persistency call here to store responses
-//                                telegramResponseStore.persistResponseAsync(recipientId, resp);
-                            })
-                            .doOnError(err -> {
-                                log.error("Error sending to {} : {}", recipientId, err.toString());
-                                telegramResponseStore.storeResponse(recipientId, "{\"ok\":false, \"error\":\"" + err.getMessage() + "\"}");
-                            })
-                            .onErrorResume(e -> Mono.empty());
-                }, concurrency)
-                .doOnSubscribe(sub -> log.info("Starting async send for {} recipients", recipientList.size()))
-                .subscribe(
-                        item -> log.info("Text Message added to publishing queue successfully."),
-                        err -> log.error("Reactive pipeline error (shouldn't cancel others): {}", err.toString()),
-                        () -> log.info("All send requests dispatched (responses may still be processing).")
-                );
-
-        return true;
+    private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage) {
+        return prepareAndSendMedia(recipientList,
+                chatId -> payloadBuilder.buildTextPayload(chatId, textMessage),
+                TELEGRAM_SEND_MESSAGE_METHOD);
     }
 
-    private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption)
-    {
-        Flux.fromIterable(recipientList)
-                .map(String::trim)
-                .filter(id -> !id.isEmpty())
-                .map(id -> Map.<String, Object>of(
-                        CHAT_ID, id,
-                        PHOTO, imageUrl,
-                        CAPTION, imageCaption))
-                .flatMap(payload -> {
-                    String recipientId = String.valueOf(payload.get(CHAT_ID));
-                    return telegramHttpConnector.sendMarketingRequest(TELEGRAM_SEND_PHOTO_METHOD, payload)
-                            .doOnNext(resp -> {
-                                telegramResponseStore.storeResponse(recipientId, resp);
-                                //TODO: add data persistency call here to store responses
-//                                telegramResponseStore.persistResponseAsync(recipientId, resp);
-                            })
-                            .doOnError(err -> {
-                                log.error("Error sending to {} : {}", recipientId, err.toString());
-                                telegramResponseStore.storeResponse(recipientId, "{\"ok\":false, \"error\":\"" + err.getMessage() + "\"}");
-                            })
-                            .onErrorResume(e -> Mono.empty());
-                }, concurrency)
-                .doOnSubscribe(sub -> log.info("Starting async send for {} recipients", recipientList.size()))
-                .subscribe(
-                        item -> log.info("Image Message added to publishing queue successfully."),
-                        err -> log.error("Reactive pipeline error (shouldn't cancel others): {}", err.toString()),
-                        () -> log.info("All send requests dispatched (responses may still be processing).")
-                );
-
-        return true;
+    private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption) {
+        return prepareAndSendMedia(recipientList,
+                chatId -> payloadBuilder.buildImagePayload(chatId, imageUrl, imageCaption),
+                TELEGRAM_SEND_PHOTO_METHOD);
     }
 
-    private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption)
-    {
-        Flux.fromIterable(recipientList)
-                .map(String::trim)
-                .filter(id -> !id.isEmpty())
-                .map(id -> Map.<String, Object>of(
-                        CHAT_ID, id,
-                        VIDEO, videoUrl,
-                        CAPTION, videoCaption))
-                .flatMap(payload -> {
-                    String recipientId = String.valueOf(payload.get(CHAT_ID));
-                    return telegramHttpConnector.sendMarketingRequest(TELEGRAM_SEND_VIDEO_METHOD, payload)
-                            .doOnNext(resp -> {
-                                telegramResponseStore.storeResponse(recipientId, resp);
-                                //TODO: add data persistency call here to store responses
-//                                telegramResponseStore.persistResponseAsync(recipientId, resp);
-                            })
-                            .doOnError(err -> {
-                                log.error("Error sending to {} : {}", recipientId, err.toString());
-                                telegramResponseStore.storeResponse(recipientId, "{\"ok\":false, \"error\":\"" + err.getMessage() + "\"}");
-                            })
-                            .onErrorResume(e -> Mono.empty());
-                }, concurrency)
-                .doOnSubscribe(sub -> log.info("Starting async send for {} recipients", recipientList.size()))
-                .subscribe(
-                        item -> log.info("Video Message added to publishing queue successfully."),
-                        err -> log.error("Reactive pipeline error (shouldn't cancel others): {}", err.toString()),
-                        () -> log.info("All send requests dispatched (responses may still be processing).")
-                );
-
-        return true;
+    private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption) {
+        return prepareAndSendMedia(recipientList,
+                chatId -> payloadBuilder.buildVideoPayload(chatId, videoUrl, videoCaption),
+                TELEGRAM_SEND_VIDEO_METHOD);
     }
-
 }
