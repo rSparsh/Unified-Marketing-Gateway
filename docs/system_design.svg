@@ -1,0 +1,95 @@
+
+<svg width="900" height="520" viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="520" fill="#020617"/>
+  <style>
+    .box { fill:#020617; stroke:#38bdf8; stroke-width:2; rx:10; }
+    .soft { fill:#020617; stroke:#64748b; stroke-width:1.5; rx:10; }
+    .text { fill:#e2e8f0; font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:14px; }
+    .title { fill:#38bdf8; font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:20px; font-weight:bold; }
+    .label { fill:#94a3b8; font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:12px; }
+    .arrow { stroke:#38bdf8; stroke-width:2; marker-end:url(#arrowhead); }
+    .arrow-soft { stroke:#64748b; stroke-width:1.5; marker-end:url(#arrowhead-soft); }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrowhead-soft" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="260" y="40" class="title">Unified Marketing Gateway - System Design</text>
+
+  <!-- Clients -->
+  <rect x="60" y="80" width="200" height="70" class="box"/>
+  <text x="90" y="110" class="text">Client Systems / CRM</text>
+  <text x="80" y="130" class="label">Internal apps, dashboards, batch jobs</text>
+
+  <!-- Gateway API -->
+  <line x1="260" y1="115" x2="320" y2="115" class="arrow"/>
+  <rect x="320" y="80" width="230" height="70" class="box"/>
+  <text x="345" y="110" class="text">Unified Marketing Gateway API</text>
+  <text x="335" y="130" class="label">REST endpoint: /broadcast</text>
+
+  <!-- Config / Campaigns -->
+  <rect x="580" y="75" width="240" height="80" class="soft"/>
+  <text x="600" y="105" class="text">Campaign &amp; Channel Config Store</text>
+  <text x="595" y="125" class="label">Channel routing, rate limits, templates</text>
+
+  <line x1="550" y1="115" x2="580" y2="115" class="arrow-soft"/>
+
+  <!-- Platform Selector -->
+  <line x1="435" y1="150" x2="435" y2="185" class="arrow"/>
+  <rect x="310" y="185" width="250" height="70" class="box"/>
+  <text x="340" y="215" class="text">Platform Selector &amp; Routing</text>
+  <text x="325" y="235" class="label">Decides Telegram / WhatsApp / SMS / Email</text>
+
+  <!-- Arrows down to flows -->
+  <line x1="435" y1="255" x2="435" y2="290" class="arrow"/>
+
+  <!-- Processing pipeline -->
+  <rect x="190" y="290" width="490" height="170" class="soft"/>
+  <text x="210" y="315" class="text">Reactive Processing Pipeline</text>
+
+  <!-- Stages inside pipeline -->
+  <rect x="210" y="330" width="140" height="50" class="box"/>
+  <text x="225" y="360" class="text">Validation</text>
+  <text x="215" y="380" class="label">Schema, auth, quota</text>
+
+  <line x1="350" y1="355" x2="370" y2="355" class="arrow-soft"/>
+
+  <rect x="370" y="330" width="150" height="50" class="box"/>
+  <text x="385" y="360" class="text">Payload Builder</text>
+  <text x="380" y="380" class="label">Channel-specific message body</text>
+
+  <line x1="520" y1="355" x2="540" y2="355" class="arrow-soft"/>
+
+  <rect x="540" y="330" width="120" height="50" class="box"/>
+  <text x="553" y="360" class="text">Rate Limiter</text>
+  <text x="545" y="380" class="label">Flux window / backpressure</text>
+
+  <!-- Retry & Metrics -->
+  <rect x="210" y="398" width="190" height="50" class="box"/>
+  <text x="225" y="428" class="text">Retry &amp; Backoff Handler</text>
+
+  <rect x="430" y="398" width="230" height="50" class="box"/>
+  <text x="445" y="428" class="text">Metrics &amp; Observability</text>
+  <text x="440" y="448" class="label">Latency, errors, per-channel stats</text>
+
+  <!-- From rate limiter down to channels -->
+  <line x1="600" y1="380" x2="600" y2="430" class="arrow-soft"/>
+
+  <!-- Channel adapters box -->
+  <rect x="120" y="470" width="660" height="40" class="soft"/>
+  <text x="140" y="495" class="text">Channel Adapters: Telegram · WhatsApp · SMS · Email · Push</text>
+
+  <!-- Edge arrows to providers (abstract) -->
+  <line x1="120" y1="490" x2="60" y2="490" class="arrow-soft"/>
+  <line x1="780" y1="490" x2="840" y2="490" class="arrow-soft"/>
+
+  <text x="35" y="495" class="label" transform="rotate(-90 35 495)">Providers</text>
+  <text x="845" y="495" class="label" transform="rotate(90 845 495)">External APIs</text>
+</svg>

@@ -1,8 +1,8 @@
-🚀 Unified Marketing Gateway
+# **🚀 Unified Marketing Gateway**
 
 A reactive, extensible backend platform for multi-channel ad broadcasting.
 
-📌 Overview
+## 📌 Overview
 
 Unified Marketing Gateway is a backend system that enables businesses to broadcast marketing messages across multiple communication platforms (Telegram, WhatsApp, SMS, Email, etc.) through a single unified API.
 
@@ -11,7 +11,7 @@ The system is designed with reactive, scalable, rate-limited, and fault-tolerant
 The project is currently in progress.
 Phase 1 implements the Telegram broadcast flow using Spring WebFlux.
 
-🎯 Current Features (Phase 1 — Telegram Integration)
+## 🎯 Current Features (Phase 1 — Telegram Integration)
 ✔ Reactive Pipeline for Outbound Requests
 
 Built using Spring WebFlux with fully non-blocking flows.
@@ -54,7 +54,7 @@ Email services
 
 Push notification platforms
 
-🛠 Tech Stack
+## 🛠 Tech Stack
 Component	Technology
 Language	Java 17
 Framework	Spring Boot (WebFlux)
@@ -63,32 +63,12 @@ HTTP Client	WebClient
 Build Tool	Maven/Gradle
 Deployment	(Planned) Docker + Kubernetes
 Future Plans	Redis rate-limiter, Kafka event ingestion
-📐 High-Level Architecture
-+------------------------------+
-|  Unified Marketing Gateway   |
-+------------------------------+
-|
-v
-+-----------------------+
-|  Platform Selector    |
-+-----------------------+
-|       |      |
-v       v      v
-Telegram   SMS   WhatsApp
-|
-v
-+---------------------------+
-| Reactive Broadcast Flow   |
-+---------------------------+
-| Validate Request
-| Build Payload
-| Apply Rate Limit
-| Execute Async Call
-| Retry (Exponential Backoff)
-v
-Provider API
 
-🚧 Roadmap
+## 🧱 System Design
+
+![Unified Marketing Gateway – System Design](docs/system_design.svg)
+
+## 🚧 Roadmap
 🔹 Phase 2 (Upcoming)
 
 WhatsApp integration
@@ -117,15 +97,11 @@ Analytics & delivery metrics
 
 Rule-engine for intelligent routing
 
-🤝 Contributions
+## 🤝 Contributions
 
 Since this is a personal development project, contributions are welcome via pull requests or suggestions through issues.
 
-📄 License
-
-MIT License (or specify if different)
-
-📬 Contact
+## 📬 Contact
 
 Author: Sparsh Raj
 GitHub: https://github.com/rSparsh
