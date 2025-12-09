@@ -17,4 +17,6 @@ public class Constants {
     public static final String ERROR_EMPTY_IMAGE_CAPTION = "Empty image caption";
     public static final String ERROR_EMPTY_VIDEO_URL = "Empty video url";
     public static final String ERROR_EMPTY_VIDEO_CAPTION = "Empty video caption";
+    public static final String MAX_RECIPIENT_LIST_SIZE = "RecipientList can have max 100 chatIDs";
+    public static final String MESSAGES = "messages";
 }
