@@ -1,7 +1,8 @@
 package com.project.unifiedMarketingGateway.enums;
 
 public enum ClientType {
-    TELEGRAM("Telegram");
+    TELEGRAM("Telegram"),
+    WHATSAPP("Whatsapp");
 
     private final String value;
 

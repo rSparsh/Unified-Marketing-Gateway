@@ -4,7 +4,6 @@ import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import io.micrometer.common.util.StringUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +11,7 @@ import java.util.List;
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
 
 @Service
-public class TelegramSendNotificationRequestValidator implements SendNotificationRequestValidator{
+public class WhatsappSendNotificationRequestValidator implements SendNotificationRequestValidator{
 
     @Override
     public List<String> validateSendNotificationRequest(SendNotificationRequest request)

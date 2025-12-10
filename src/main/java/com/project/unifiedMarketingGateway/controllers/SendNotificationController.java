@@ -5,6 +5,7 @@ import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
 import com.project.unifiedMarketingGateway.processor.telegram.TelegramRequestProcessor;
+import com.project.unifiedMarketingGateway.processor.whatsapp.WhatsappRequestProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +22,8 @@ public class SendNotificationController {
 
     @Autowired
     TelegramRequestProcessor telegramRequestProcessor;
+    @Autowired
+    WhatsappRequestProcessor whatsappRequestProcessor;
 
     @PostMapping("/sendNotification")
     public SendNotificationResponse sendNotification(@RequestHeader ClientType clientType,
@@ -33,7 +36,8 @@ public class SendNotificationController {
                 .build();
 
         switch(clientType){
-            case TELEGRAM: response = telegramRequestProcessor.processNotificationRequest(request);
+            case TELEGRAM: response = telegramRequestProcessor.processNotificationRequest(request); break;
+            case WHATSAPP: response = whatsappRequestProcessor.processNotificationRequest(request);
             break;
         }
 

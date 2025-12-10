@@ -4,29 +4,29 @@ spring:
   config:
     import: "optional:classpath:application-secrets.yaml"
 
+
+#Add only Telegram related configs below this line
 telegram:
   baseUrl: https://api.telegram.org
   maxConcurrency: 8
   contentBasedResource:
     text:
       isEnabled: true
-      path: sendMessage
     image:
-      local:
-        isEnabled: false
-        path: sendPhoto
-      remote:
-        isEnabled: false
-        path: sendPhoto
+      isEnabled: false
     video:
       isEnabled: false
-      path: sendVideo
-  group:
-    - chatID: "-4871935676"
-    - chatID: "8146034511"
-    - chatID: "7642285695"
   retry:
     maxRetryCount: 4
     initialBackoff: 1
     maxBackoff: 30
 
+#Add only Whatsapp related configs below this line
+whatsapp:
+  baseUrl: https://graph.facebook.com
+  api-version: "v20.0"
+  maxConcurrency: 8
+  retry:
+    maxRetryCount: 4
+    initialBackoff: 1
+    maxBackoff: 30
