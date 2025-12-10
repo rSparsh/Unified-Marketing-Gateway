@@ -30,7 +30,7 @@ public class WhatsappHttpConnector implements ConnectorInterface {
 
     public WhatsappHttpConnector(@Value("${whatsapp.baseUrl:https://graph.facebook.com}") String baseUrl,
             @Value("${whatsapp.api-version:v20.0}") String apiVersion,
-            @Value("${whatsapp.phone-number-id}") String phoneNumberId) {
+            @Value("${whatsapp.phone-number-id:PLEASE_SET_SECRETS}") String phoneNumberId) {
 
         // final base url becomes: https://graph.facebook.com/v20.0/{phone_number_id}
         String fullBaseUrl = baseUrl + "/" + apiVersion + "/" + phoneNumberId;
