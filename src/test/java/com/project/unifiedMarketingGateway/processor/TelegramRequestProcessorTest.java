@@ -17,9 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -59,6 +57,9 @@ public class TelegramRequestProcessorTest {
         setField(telegramRequestProcessor, "responseBuilder", responseBuilder);
         setField(telegramRequestProcessor, "requestValidator", requestValidator);
         setField(telegramRequestProcessor, "maxConcurrency", 3);
+        setField(telegramRequestProcessor, "isTextEnabled", true);
+        setField(telegramRequestProcessor, "isImageEnabled", true);
+        setField(telegramRequestProcessor, "isVideoEnabled", true);
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {

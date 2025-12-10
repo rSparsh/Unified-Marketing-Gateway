@@ -19,4 +19,7 @@ public class Constants {
     public static final String ERROR_EMPTY_VIDEO_CAPTION = "Empty video caption";
     public static final String MAX_RECIPIENT_LIST_SIZE = "RecipientList can have max 100 chatIDs";
     public static final String MESSAGES = "messages";
+    public static final String TEXT_MEDIA_DISABLED_ERROR = "Text Media is disabled.";
+    public static final String IMAGE_MEDIA_DISABLED_ERROR = "Image Media is disabled.";
+    public static final String VIDEO_MEDIA_DISABLED_ERROR = "Video Media is disabled.";
 }
