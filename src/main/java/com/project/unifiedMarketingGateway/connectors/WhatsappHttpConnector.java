@@ -23,7 +23,7 @@ import java.util.Map;
 @Service
 public class WhatsappHttpConnector implements ConnectorInterface {
 
-    @Value("${whatsapp.accessToken}")
+    @Value("${whatsapp.accessToken:PLEASE_SET_SECRETS}")
     private String accessToken;
 
     private final WebClient webClient;
