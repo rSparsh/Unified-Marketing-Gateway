@@ -5,7 +5,7 @@ Note:
 3. For "IMAGE" --> "imageUrl" & "imageCaption" are mandatory.
 3. For "VIDEO" --> "videoUrl" & "videoCaption" are mandatory.
 4. For all requests, "recipientList" must be non-empty and max of 100 chatIDs are permitted in 1 request.
-
+5. The ClientType header accepts only 2 values: TELEGRAM, WHATSAPP. Set this header according to your respective target channel.
 
 ##You can import the below curl to your Postman app, replace the values with yours, and trigger the request.
 

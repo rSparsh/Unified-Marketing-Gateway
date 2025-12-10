@@ -114,7 +114,7 @@ Rule-engine for intelligent routing
    ```
 
 2. **Create Secrets File**  
-   Follow the steps mentioned in the application-secrets.yaml file to create your own secrets file.
+   Follow the steps mentioned in the application-secrets.example.yaml file to create your own secrets file.
    Edit `application-secrets.yaml` to include your configuration (e.g., API keys, database credentials).
 
 

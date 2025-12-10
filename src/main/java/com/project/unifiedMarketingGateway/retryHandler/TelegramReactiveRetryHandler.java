@@ -2,7 +2,7 @@ package com.project.unifiedMarketingGateway.retryHandler;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
@@ -14,7 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
-@Component
+@Service
 @Slf4j
 public class TelegramReactiveRetryHandler implements ReactiveRetryHandlerInterface {
 
