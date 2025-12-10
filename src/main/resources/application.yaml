@@ -30,3 +30,10 @@ whatsapp:
     maxRetryCount: 4
     initialBackoff: 1
     maxBackoff: 30
+  contentBasedResource:
+    text:
+      isEnabled: false
+    image:
+      isEnabled: false
+    video:
+      isEnabled: false

@@ -20,6 +20,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -51,6 +52,15 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     @Value("${telegram.maxConcurrency:5}")
     private int maxConcurrency;
 
+    @Value("${telegram.contentBasedResource.text.isEnabled:false}")
+    private boolean isTextEnabled;
+
+    @Value("${telegram.contentBasedResource.image.isEnabled:false}")
+    private boolean isImageEnabled;
+
+    @Value("${telegram.contentBasedResource.video.isEnabled:false}")
+    private boolean isVideoEnabled;
+
 //    private record SendResult(String chatId, boolean success, String responseBody, String errorMessage) {}
 
     @Override
@@ -70,14 +80,36 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         String videoCaption = sendNotificationRequest.getVideoCaption();
 
         boolean allQueued = true;
+        List<String> mediaDisabledErrorList = new ArrayList<>();
 
         // iterate media types and queue work (synchronous control only indicates queuing success)
         for (MediaType mediaType : mediaTypeList) {
             boolean ok;
             switch (mediaType) {
-                case TEXT -> ok = prepareAndSendTextMedia(recipientList, textMessage);
-                case IMAGE -> ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
-                case VIDEO -> ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
+                case TEXT -> {
+                    if(isTextEnabled)
+                        ok = prepareAndSendTextMedia(recipientList, textMessage);
+                    else {
+                        mediaDisabledErrorList.add(TEXT_MEDIA_DISABLED_ERROR);
+                        ok = false;
+                    }
+                }
+                case IMAGE -> {
+                    if(isImageEnabled)
+                        ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
+                    else {
+                        mediaDisabledErrorList.add(IMAGE_MEDIA_DISABLED_ERROR);
+                        ok = false;
+                    }
+                }
+                case VIDEO -> {
+                    if(isVideoEnabled)
+                        ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
+                    else {
+                        mediaDisabledErrorList.add(VIDEO_MEDIA_DISABLED_ERROR);
+                        ok = false;
+                    }
+                }
                 default -> ok = false;
             }
             allQueued = allQueued && ok;
@@ -86,7 +118,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         if (allQueued) {
             return responseBuilder.buildSuccessResponse("Notification request added to queue successfully");
         } else {
-            return responseBuilder.buildFailureResponse("Notification request couldn't be processed.");
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed." + mediaDisabledErrorList.toString());
         }
     }
 

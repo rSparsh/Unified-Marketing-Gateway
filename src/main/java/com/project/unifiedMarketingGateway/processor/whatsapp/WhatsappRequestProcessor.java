@@ -19,11 +19,13 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static com.project.unifiedMarketingGateway.constants.Constants.MESSAGES;
+import static com.project.unifiedMarketingGateway.constants.Constants.*;
+import static com.project.unifiedMarketingGateway.constants.Constants.VIDEO_MEDIA_DISABLED_ERROR;
 
 @Service
 @Slf4j
@@ -44,6 +46,15 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
 
     @Value("${whatsapp.maxConcurrency:5}")
     private int maxConcurrency;
+
+    @Value("${whatsapp.contentBasedResource.text.isEnabled:false}")
+    private boolean isTextEnabled;
+
+    @Value("${whatsapp.contentBasedResource.image.isEnabled:false}")
+    private boolean isImageEnabled;
+
+    @Value("${whatsapp.contentBasedResource.video.isEnabled:false}")
+    private boolean isVideoEnabled;
 
     @Override
     public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest request) {
@@ -71,24 +82,45 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
 
         boolean anyQueued  = false;
         boolean allQueued  = true;
+        List<String> mediaDisabledErrorList = new ArrayList<>();
 
         for (MediaType mediaType : mediaTypeList) {
             boolean ok;
             switch (mediaType) {
-                case TEXT -> ok = prepareAndSendTextMedia(recipientList, textMessage);
-                case IMAGE -> ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
-                case VIDEO -> ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
-                default      -> ok = false;
+                case TEXT -> {
+                    if(isTextEnabled)
+                        ok = prepareAndSendTextMedia(recipientList, textMessage);
+                    else {
+                        mediaDisabledErrorList.add(TEXT_MEDIA_DISABLED_ERROR);
+                        ok = false;
+                    }
+                }
+                case IMAGE -> {
+                    if(isImageEnabled)
+                        ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
+                    else {
+                        mediaDisabledErrorList.add(IMAGE_MEDIA_DISABLED_ERROR);
+                        ok = false;
+                    }
+                }
+                case VIDEO -> {
+                    if(isVideoEnabled)
+                        ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
+                    else {
+                        mediaDisabledErrorList.add(VIDEO_MEDIA_DISABLED_ERROR);
+                        ok = false;
+                    }
+                }
+                default -> ok = false;
             }
-            anyQueued  = anyQueued || ok;
-            allQueued  = allQueued && ok;
+            allQueued = allQueued && ok;
         }
 
         if (!anyQueued) {
-            return responseBuilder.buildFailureResponse("Notification request couldn't be processed for WhatsApp.");
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed for WhatsApp." + mediaDisabledErrorList.toString());
         }
         if (!allQueued) {
-            return responseBuilder.buildFailureResponse("Notification request was only partially queued for WhatsApp.");
+            return responseBuilder.buildFailureResponse("Notification request was only partially queued for WhatsApp." + mediaDisabledErrorList.toString());
         }
 
         return responseBuilder.buildSuccessResponse("Notification request added to queue successfully for WhatsApp.");
