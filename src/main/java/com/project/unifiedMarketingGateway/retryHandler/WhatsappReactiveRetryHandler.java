@@ -3,6 +3,7 @@ package com.project.unifiedMarketingGateway.retryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -36,7 +37,8 @@ public class WhatsappReactiveRetryHandler implements ReactiveRetryHandlerInterfa
             131056   // Pair rate limit hit – too many msgs to same recipient
     );
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    ObjectMapper objectMapper;
 
     @Value("${whatsapp.retry.maxRetryCount:4}")
     private int maxRetries;
