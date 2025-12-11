@@ -64,7 +64,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     @Value("${whatsapp.contentBasedResource.video.isEnabled:false}")
     private boolean isVideoEnabled;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired ObjectMapper objectMapper;
 
     @Override
     public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest request) {
