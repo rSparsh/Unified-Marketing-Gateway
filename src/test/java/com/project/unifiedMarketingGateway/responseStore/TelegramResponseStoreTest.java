@@ -1,8 +1,8 @@
 package com.project.unifiedMarketingGateway.responseStore;
 
+import com.project.unifiedMarketingGateway.store.responseStore.TelegramResponseStore;
 import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import static org.junit.jupiter.api.Assertions.*;
 

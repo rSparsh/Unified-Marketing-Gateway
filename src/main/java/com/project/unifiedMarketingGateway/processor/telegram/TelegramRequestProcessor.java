@@ -8,7 +8,7 @@ import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
 import com.project.unifiedMarketingGateway.processor.RequestProcessorInterface;
 import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
-import com.project.unifiedMarketingGateway.responseStore.TelegramResponseStore;
+import com.project.unifiedMarketingGateway.store.responseStore.TelegramResponseStore;
 import com.project.unifiedMarketingGateway.retryHandler.TelegramReactiveRetryHandler;
 import com.project.unifiedMarketingGateway.validators.TelegramSendNotificationRequestValidator;
 import lombok.NonNull;

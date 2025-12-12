@@ -10,6 +10,7 @@ public class WhatsappMessage {
      String waMessageId;          // wamid.* from WA response
      String recipient;           // phone number in international format
      String mediaType;           // "TEXT", "IMAGE", "VIDEO"
+     String requestId;
      long createdAtEpochMillis;
      Long lastUpdatedEpochMillis;
      WhatsappMessageStatus status;
