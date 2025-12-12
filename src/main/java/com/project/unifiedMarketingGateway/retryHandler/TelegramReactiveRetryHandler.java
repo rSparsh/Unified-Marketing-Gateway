@@ -1,6 +1,8 @@
 package com.project.unifiedMarketingGateway.retryHandler;
 
+import com.project.unifiedMarketingGateway.metrics.MetricsService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -14,9 +16,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
+import static com.project.unifiedMarketingGateway.enums.ClientType.TELEGRAM;
+
 @Service
 @Slf4j
 public class TelegramReactiveRetryHandler implements ReactiveRetryHandlerInterface {
+
+    @Autowired
+    MetricsService metricsService;
 
     @Value("${telegram.retry.maxRetryCount:4}")
     private int maxRetries;
@@ -56,6 +63,7 @@ public class TelegramReactiveRetryHandler implements ReactiveRetryHandlerInterfa
 
                     Duration retryAfter = extractRetryAfter(failure);
                     Duration delay = retryAfter != null ? retryAfter : computeBackoff(attempt);
+                    metricsService.incrementRetry(TELEGRAM.getValue());
 
                     log.info("Retry attempt={} will retry after {} ms due to: {}", attempt, delay.toMillis(), shortError(failure));
                     return Mono.delay(delay);

@@ -3,6 +3,7 @@ package com.project.unifiedMarketingGateway.webhook;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
+import com.project.unifiedMarketingGateway.metrics.MetricsService;
 import com.project.unifiedMarketingGateway.store.messageStore.WhatsappMessageStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,8 @@ public class WhatsappWebhookService {
 
     @Autowired ObjectMapper objectMapper;
     @Autowired WhatsappMessageStore messageStore;
+    @Autowired
+    MetricsService metricsService;
 
     public void processWebhookPayload(Map<String, Object> rawPayload) {
         JsonNode root = objectMapper.valueToTree(rawPayload);
@@ -48,6 +51,8 @@ public class WhatsappWebhookService {
         String messageId   = getText(statusNode, "id");
         String statusStr   = getText(statusNode, "status");
         String recipientId = getText(statusNode, "recipient_id");
+
+        metricsService.incrementWebhookEvent("status_" + statusStr);
 
         String errorCode = null;
         String errorDetails = null;
