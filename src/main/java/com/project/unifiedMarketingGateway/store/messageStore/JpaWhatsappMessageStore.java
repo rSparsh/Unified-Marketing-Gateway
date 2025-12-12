@@ -57,7 +57,6 @@ public class JpaWhatsappMessageStore implements WhatsappMessageStore {
             entity.setErrorDetails(errorDetails);
             repository.save(entity);
         }, () -> {
-            // If the send path didn't create a record (possible), create a minimal one.
             WhatsappMessageEntity entity = WhatsappMessageEntity.builder()
                     .waMessageId(waMessageId)
                     .recipient(recipient)
