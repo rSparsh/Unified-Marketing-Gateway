@@ -1,16 +1,14 @@
-package com.project.unifiedMarketingGateway.responseStore;
+package com.project.unifiedMarketingGateway.store.responseStore;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Component
 @Slf4j
-public class TelegramResponseStore {
+public class WhatsappResponseStore {
 
     // in-memory store for demo. Replace with DB persistence if desired.
     private final ConcurrentMap<String, String> responses = new ConcurrentHashMap<>();
@@ -22,15 +20,6 @@ public class TelegramResponseStore {
     }
 
     //TODO: use to provide response status for chat-id
-//    public Optional<String> getResponse(String recipientId) {
-//        return Optional.ofNullable(responses.get(recipientId));
-//    }
-
     //TODO: persist the responses in bigQuery or some other dataLake
-//    @Async("telegramExecutor")
-//    public void persistResponseAsync(String recipientId, String responseBody) {
-//        // we can replace with actual persistence logic (DB call, audit log, etc.)
-//        log.info("Persisting response for {} in background", recipientId);
-//    }
 }
 

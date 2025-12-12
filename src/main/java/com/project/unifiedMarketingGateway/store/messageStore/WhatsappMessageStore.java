@@ -1,4 +1,4 @@
-package com.project.unifiedMarketingGateway.messageStore;
+package com.project.unifiedMarketingGateway.store.messageStore;
 
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
 import com.project.unifiedMarketingGateway.models.WhatsappMessage;

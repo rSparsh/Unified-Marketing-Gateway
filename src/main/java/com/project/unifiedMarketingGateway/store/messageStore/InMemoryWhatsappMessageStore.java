@@ -1,4 +1,4 @@
-package com.project.unifiedMarketingGateway.messageStore;
+package com.project.unifiedMarketingGateway.store.messageStore;
 
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
 import com.project.unifiedMarketingGateway.models.WhatsappMessage;
@@ -9,7 +9,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-@Service
+//TODO: uncomment the @Service to use in-memory store and comment the same in JpaWhatsappMessageStore
+//@Service
 @Slf4j
 public class InMemoryWhatsappMessageStore implements WhatsappMessageStore{
 
