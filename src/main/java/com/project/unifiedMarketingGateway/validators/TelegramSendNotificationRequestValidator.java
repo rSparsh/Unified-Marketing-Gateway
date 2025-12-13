@@ -23,7 +23,7 @@ public class TelegramSendNotificationRequestValidator implements SendNotificatio
             validationErrorList.add(ERROR_EMPTY_RECIPIENT_LIST);
 
         if(request.getRecipientList().size() > 100)
-            validationErrorList.add(ERROR_EMPTY_RECIPIENT_LIST);
+            validationErrorList.add(MAX_RECIPIENT_LIST_SIZE);
 
         List<MediaType> mediaTypeList = request.getMediaTypeList();
 

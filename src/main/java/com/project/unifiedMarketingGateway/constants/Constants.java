@@ -22,4 +22,6 @@ public class Constants {
     public static final String TEXT_MEDIA_DISABLED_ERROR = "Text Media is disabled.";
     public static final String IMAGE_MEDIA_DISABLED_ERROR = "Image Media is disabled.";
     public static final String VIDEO_MEDIA_DISABLED_ERROR = "Video Media is disabled.";
+    public static final String ERROR_INVALID_MEDIA_TYPE_LIST_FOR_SMS = "Invalid Media type for SMS";
+    public static final String ERROR_TEXT_MESSAGE_SIZE_LIMIT = "Text message must be max 1600 characters.";
 }

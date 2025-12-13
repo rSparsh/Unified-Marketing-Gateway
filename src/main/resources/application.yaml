@@ -55,6 +55,17 @@ whatsapp:
     video:
       isEnabled: false
 
+#Add only SMS related configs below this line
+sms:
+  maxConcurrency: 8
+  contentBasedResource:
+    text:
+      isEnabled: false
+  retry:
+    maxRetryCount: 4
+    initialBackoff: 1
+
+#Add only Metrics related configs below this line
 management:
   endpoints:
     web:
