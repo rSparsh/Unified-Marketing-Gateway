@@ -165,7 +165,8 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                 .recipient(chatId)
                 .requestId(UUID.randomUUID().toString())
                 .build();
-
+        metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
+        metricsService.incrementInFlight(ctx.getChannel());
         ctx.markStart();
 
         Mono<String> httpCall = reactiveRetryHandler.withRetry(() -> telegramHttpConnector.sendMarketingRequest(method, payload));
