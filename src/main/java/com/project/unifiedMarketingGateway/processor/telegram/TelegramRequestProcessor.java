@@ -2,8 +2,10 @@ package com.project.unifiedMarketingGateway.processor.telegram;
 
 import com.project.unifiedMarketingGateway.builders.TelegramPayloadBuilder;
 import com.project.unifiedMarketingGateway.connectors.TelegramHttpConnector;
+import com.project.unifiedMarketingGateway.contexts.SendContext;
 import com.project.unifiedMarketingGateway.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.enums.MediaType;
+import com.project.unifiedMarketingGateway.metrics.MetricsService;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
 import com.project.unifiedMarketingGateway.processor.RequestProcessorInterface;
@@ -11,6 +13,7 @@ import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuil
 import com.project.unifiedMarketingGateway.store.responseStore.TelegramResponseStore;
 import com.project.unifiedMarketingGateway.retryHandler.TelegramReactiveRetryHandler;
 import com.project.unifiedMarketingGateway.validators.TelegramSendNotificationRequestValidator;
+import io.micrometer.core.instrument.Timer;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +26,11 @@ import reactor.core.scheduler.Schedulers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
+import static com.project.unifiedMarketingGateway.enums.ClientType.TELEGRAM;
 
 @Slf4j
 @Service
@@ -48,6 +53,8 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
 
     @Autowired
     TelegramPayloadBuilder payloadBuilder;
+    @Autowired
+    MetricsService metricsService;
 
     @Value("${telegram.maxConcurrency:5}")
     private int maxConcurrency;
@@ -152,27 +159,32 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     }
 
     private Mono<SendResultDTO> executeRequestReactive(String chatId, Map<String, Object> payload, String method) {
+        SendContext ctx = SendContext.builder()
+                .channel(TELEGRAM.getValue())
+                .method(method)
+                .recipient(chatId)
+                .requestId(UUID.randomUUID().toString())
+                .build();
+        metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
+        metricsService.incrementInFlight(ctx.getChannel());
+        ctx.markStart();
+
         Mono<String> httpCall = reactiveRetryHandler.withRetry(() -> telegramHttpConnector.sendMarketingRequest(method, payload));
 
         return httpCall
-                .publishOn(Schedulers.boundedElastic()) // offload blocking store to boundedElastic
-                .map(body -> {
-                    try {
-                        telegramResponseStore.storeResponse(chatId, body);
-                    } catch (Exception e) {
-                        log.warn("[{}] failed to persist success response: {}", chatId, e.toString());
-                    }
-                    return new SendResultDTO(chatId, true, body, null);
-                })
-                .onErrorResume(err -> {
-                    String msg = err.getMessage() == null ? err.toString() : err.getMessage();
-                    try {
-                        telegramResponseStore.storeResponse(chatId, "{\"ok\":false,\"error\":\"" + msg + "\"}");
-                    } catch (Exception e) {
-                        log.warn("[{}] failed to persist error response: {}", chatId, e.toString());
-                    }
-                    return Mono.just(new SendResultDTO(chatId, false, null, msg));
-                });
+                .publishOn(Schedulers.boundedElastic())
+                .flatMap(body -> Mono.fromCallable(() -> {
+                            // persist and metrics in sync block (boundedElastic)
+                            recordSuccess(ctx, body);
+                            return new SendResultDTO(chatId, true, body, null);
+                        })
+                )
+                .onErrorResume(err -> Mono.fromCallable(() -> {
+                            String msg = err.getMessage() == null ? err.toString() : err.getMessage();
+                            recordFailure(ctx, msg);
+                            return new SendResultDTO(chatId, false, null, msg);
+                        })
+                );
     }
 
     private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage) {
@@ -191,5 +203,31 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         return prepareAndSendMedia(recipientList,
                 chatId -> payloadBuilder.buildVideoPayload(chatId, videoUrl, videoCaption),
                 TELEGRAM_SEND_VIDEO_METHOD);
+    }
+
+    private void recordSuccess(SendContext ctx, String body) {
+        try {
+            telegramResponseStore.storeResponse(ctx.getRecipient(), body);
+        } catch (Exception e) {
+            log.warn("[{}] failed to persist success response: {}", ctx.getRecipient(), e.toString());
+        }
+
+        // metrics
+        metricsService.incrementSendSuccess(ctx.getChannel(), ctx.getMethod());
+        metricsService.recordHttpLatency(ctx.getChannel(), ctx.getMethod(), ctx.elapsed());
+        metricsService.decrementInFlight(ctx.getChannel());
+    }
+
+    private void recordFailure(SendContext ctx, String errorMessage) {
+        try {
+            telegramResponseStore.storeResponse(ctx.getRecipient(), "{\"ok\":false,\"error\":\"" + errorMessage + "\"}");
+        } catch (Exception e) {
+            log.warn("[{}] failed to persist error response: {}", ctx.getRecipient(), e.toString());
+        }
+
+        // metrics
+        metricsService.incrementSendFailure(ctx.getChannel(), ctx.getMethod(), errorMessage);
+        metricsService.recordHttpLatency(ctx.getChannel(), ctx.getMethod(), ctx.elapsed());
+        metricsService.decrementInFlight(ctx.getChannel());
     }
 }

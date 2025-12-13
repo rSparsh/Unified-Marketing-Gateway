@@ -54,3 +54,16 @@ whatsapp:
       isEnabled: false
     video:
       isEnabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ["health", "prometheus", "metrics", "httptrace"]
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
