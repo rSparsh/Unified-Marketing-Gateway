@@ -11,7 +11,7 @@ import java.util.List;
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
 
 @Service
-public class WhatsappSendNotificationRequestValidator implements SendNotificationRequestValidator{
+public class SmsTwilioSendNotificationRequestValidator implements SendNotificationRequestValidator{
 
     @Override
     public List<String> validateSendNotificationRequest(SendNotificationRequest request)
@@ -34,19 +34,10 @@ public class WhatsappSendNotificationRequestValidator implements SendNotificatio
                         case TEXT:
                             if(StringUtils.isEmpty(request.getTextMessage()))
                                 validationErrorList.add(ERROR_EMPTY_TEXT_MESSAGE);
+                            if(request.getTextMessage().length() > 1600)
+                                validationErrorList.add(ERROR_TEXT_MESSAGE_SIZE_LIMIT);
                             break;
-                        case IMAGE:
-                            if(StringUtils.isEmpty(request.getImageUrl()))
-                                validationErrorList.add(ERROR_EMPTY_IMAGE_URL);
-                            if(StringUtils.isEmpty(request.getImageCaption()))
-                                validationErrorList.add(ERROR_EMPTY_IMAGE_CAPTION);
-                            break;
-                        case VIDEO:
-                            if(StringUtils.isEmpty(request.getVideoUrl()))
-                                validationErrorList.add(ERROR_EMPTY_VIDEO_URL);
-                            if(StringUtils.isEmpty(request.getVideoCaption()))
-                                validationErrorList.add(ERROR_EMPTY_VIDEO_CAPTION);
-                            break;
+                        default: validationErrorList.add(ERROR_INVALID_MEDIA_TYPE_LIST_FOR_SMS);
                     }
                 }
         );

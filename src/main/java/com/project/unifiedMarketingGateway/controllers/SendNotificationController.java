@@ -4,6 +4,7 @@ import com.project.unifiedMarketingGateway.enums.ClientType;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
+import com.project.unifiedMarketingGateway.processor.sms.SmsRequestProcessor;
 import com.project.unifiedMarketingGateway.processor.telegram.TelegramRequestProcessor;
 import com.project.unifiedMarketingGateway.processor.whatsapp.WhatsappRequestProcessor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,11 +25,17 @@ public class SendNotificationController {
     TelegramRequestProcessor telegramRequestProcessor;
     @Autowired
     WhatsappRequestProcessor whatsappRequestProcessor;
+    @Autowired
+    SmsRequestProcessor smsRequestProcessor;
 
-    @PostMapping("/sendNotification")
+    @PostMapping(
+            value = "/sendNotification",
+            consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE
+    )
     public SendNotificationResponse sendNotification(@RequestHeader ClientType clientType,
             @RequestBody SendNotificationRequest request){
-        log.info("SendNotificationController::sendNotification request: {}", request);
+        log.debug("SendNotificationController::sendNotification request: {}", request);
 
         SendNotificationResponse response = SendNotificationResponse.builder()
                 .responseStatus("400")
@@ -36,8 +43,11 @@ public class SendNotificationController {
                 .build();
 
         switch(clientType){
-            case TELEGRAM: response = telegramRequestProcessor.processNotificationRequest(request); break;
+            case TELEGRAM: response = telegramRequestProcessor.processNotificationRequest(request);
+            break;
             case WHATSAPP: response = whatsappRequestProcessor.processNotificationRequest(request);
+            break;
+            case SMS: response = smsRequestProcessor.processNotificationRequest(request);
             break;
         }
 
