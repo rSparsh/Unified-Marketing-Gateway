@@ -10,6 +10,7 @@ import com.project.unifiedMarketingGateway.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
+import com.project.unifiedMarketingGateway.processor.IdempotencyService;
 import com.project.unifiedMarketingGateway.store.messageStore.WhatsappMessageStore;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
@@ -57,6 +58,8 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     WhatsappMessageStore messageStore;
     @Autowired
     MetricsService metricsService;
+    @Autowired
+    IdempotencyService idempotencyService;
 
     @Value("${whatsapp.maxConcurrency:5}")
     private int maxConcurrency;
@@ -151,6 +154,24 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
                 .recipient(chatID)
                 .requestId(UUID.randomUUID().toString())
                 .build();
+
+        if (!idempotencyService.tryStart(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        )) {
+            log.info("[{}] Duplicate request blocked", ctx.getRequestId());
+            return Mono.just(
+                    new SendResultDTO(
+                            ctx.getRecipient(),
+                            true,
+                            "DUPLICATE",
+                            null
+                    )
+            );
+        }
+
         metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
         metricsService.incrementInFlight(ctx.getChannel());
         ctx.markStart();
@@ -265,6 +286,14 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordSuccess(SendContext ctx, String body) {
+        idempotencyService.markCompleted(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
+
         try {
             whatsappResponseStore.storeResponse(ctx.getRecipient(), body);
         } catch (Exception e) {
@@ -278,6 +307,13 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordFailure(SendContext ctx, String errorMessage) {
+        idempotencyService.markFailed(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
         try {
             whatsappResponseStore.storeResponse(ctx.getRecipient(), "{\"ok\":false,\"error\":\"" + errorMessage + "\"}");
         } catch (Exception e) {
