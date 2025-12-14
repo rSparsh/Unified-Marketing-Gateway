@@ -8,6 +8,7 @@ import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
+import com.project.unifiedMarketingGateway.processor.IdempotencyService;
 import com.project.unifiedMarketingGateway.processor.RequestProcessorInterface;
 import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
 import com.project.unifiedMarketingGateway.store.responseStore.TelegramResponseStore;
@@ -55,6 +56,8 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     TelegramPayloadBuilder payloadBuilder;
     @Autowired
     MetricsService metricsService;
+    @Autowired
+    IdempotencyService idempotencyService;
 
     @Value("${telegram.maxConcurrency:5}")
     private int maxConcurrency;
@@ -165,7 +168,25 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                 .recipient(chatId)
                 .requestId(UUID.randomUUID().toString())
                 .build();
-        metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
+
+        if (!idempotencyService.tryStart(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        )) {
+            log.info("[{}] Duplicate request blocked", ctx.getRequestId());
+            return Mono.just(
+                    new SendResultDTO(
+                            ctx.getRecipient(),
+                            true,
+                            "DUPLICATE",
+                            null
+                    )
+            );
+        }
+
+            metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
         metricsService.incrementInFlight(ctx.getChannel());
         ctx.markStart();
 
@@ -206,6 +227,12 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordSuccess(SendContext ctx, String body) {
+        idempotencyService.markCompleted(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
         try {
             telegramResponseStore.storeResponse(ctx.getRecipient(), body);
         } catch (Exception e) {
@@ -219,6 +246,13 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordFailure(SendContext ctx, String errorMessage) {
+        idempotencyService.markFailed(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
         try {
             telegramResponseStore.storeResponse(ctx.getRecipient(), "{\"ok\":false,\"error\":\"" + errorMessage + "\"}");
         } catch (Exception e) {

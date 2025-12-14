@@ -4,6 +4,7 @@ import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuil
 import com.project.unifiedMarketingGateway.connectors.TwilioSmsConnector;
 import com.project.unifiedMarketingGateway.contexts.SendContext;
 import com.project.unifiedMarketingGateway.dto.SendResultDTO;
+import com.project.unifiedMarketingGateway.processor.IdempotencyService;
 import com.project.unifiedMarketingGateway.store.messageStore.SmsMessageStore;
 import com.twilio.rest.api.v2010.account.Message;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
@@ -42,6 +43,8 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
     SmsReactiveRetryHandler reactiveRetryHandler;
     @Autowired
     SmsMessageStore smsMessageStore;
+    @Autowired
+    IdempotencyService idempotencyService;
 
     @Value("${sms.maxConcurrency:5}")
     private int maxConcurrency;
@@ -114,6 +117,23 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
                 .requestId(UUID.randomUUID().toString())
                 .build();
 
+        if (!idempotencyService.tryStart(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        )) {
+            log.info("[{}] Duplicate request blocked", ctx.getRequestId());
+            return Mono.just(
+                    new SendResultDTO(
+                            ctx.getRecipient(),
+                            true,
+                            "DUPLICATE",
+                            null
+                    )
+            );
+        }
+
         metricsService.incrementSendAttempt(ctx.getChannel(), "TEXT");
         metricsService.incrementInFlight(ctx.getChannel());
         smsMessageStore.storeQueued(chatId);
@@ -151,6 +171,13 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordSuccess(SendContext ctx, String sid) {
+        idempotencyService.markCompleted(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
         try {
             smsMessageStore.storeSent(sid, ctx.getRecipient());
         } catch (Exception e) {
@@ -164,6 +191,13 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordFailure(SendContext ctx, String errorMessage) {
+        idempotencyService.markFailed(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
         try {
             smsMessageStore.storeFailed(ctx.getRecipient(), errorMessage);
         } catch (Exception e) {
