@@ -14,9 +14,9 @@ public class TwilioSmsConnector {
     private final String fromNumber;
 
     public TwilioSmsConnector(
-            @Value("${sms.twilio.accountSid}") String accountSid,
-            @Value("${sms.twilio.authToken}") String authToken,
-            @Value("${sms.twilio.fromNumber}") String fromNumber
+            @Value("${sms.twilio.accountSid:PLEASE_SET_SECRETS}") String accountSid,
+            @Value("${sms.twilio.authToken:PLEASE_SET_SECRETS}") String authToken,
+            @Value("${sms.twilio.fromNumber:PLEASE_SET_SECRETS}") String fromNumber
     ) {
         Twilio.init(accountSid, authToken);
         this.fromNumber = fromNumber;
