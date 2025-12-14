@@ -20,9 +20,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.project.unifiedMarketingGateway.constants.Constants.TEXT_MEDIA_DISABLED_ERROR;
 import static com.project.unifiedMarketingGateway.enums.ClientType.SMS;
 import static com.project.unifiedMarketingGateway.enums.MediaType.TEXT;
 
@@ -38,8 +40,8 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
     SendNotificationResponseBuilder responseBuilder;
     @Autowired
     SmsReactiveRetryHandler reactiveRetryHandler;
-//    @Autowired
-//    SmsMessageStore smsMessageStore;
+    @Autowired
+    SmsMessageStore smsMessageStore;
 
     @Value("${sms.maxConcurrency:5}")
     private int maxConcurrency;
@@ -58,11 +60,17 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
         String textMessage = sendNotificationRequest.getTextMessage();
 
         boolean allQueued = false;
-        allQueued = prepareAndSendMedia(recipientList, textMessage);
+        List<String> mediaDisabledErrorList = new ArrayList<>();
+
+        if(isTextEnabled)
+            allQueued = prepareAndSendMedia(recipientList, textMessage);
+        else
+            mediaDisabledErrorList.add(TEXT_MEDIA_DISABLED_ERROR);
+
         if (allQueued) {
             return responseBuilder.buildSuccessResponse("Notification request added to queue successfully");
         } else {
-            return responseBuilder.buildFailureResponse("Notification request couldn't be processed.");
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed." + mediaDisabledErrorList.toString());
         }
     }
 
@@ -108,6 +116,7 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
 
         metricsService.incrementSendAttempt(ctx.getChannel(), "TEXT");
         metricsService.incrementInFlight(ctx.getChannel());
+        smsMessageStore.storeQueued(chatId);
         ctx.markStart();
 
         Mono<String> smsMono =
@@ -142,11 +151,11 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordSuccess(SendContext ctx, String sid) {
-//        try {
-//            smsMessageStore.storeSent(sid, ctx.getRecipient());
-//        } catch (Exception e) {
-//            log.warn("[{}] failed to persist success response: {}", ctx.getRecipient(), e.toString());
-//        }
+        try {
+            smsMessageStore.storeSent(sid, ctx.getRecipient());
+        } catch (Exception e) {
+            log.warn("[{}] failed to persist success response: {}", ctx.getRecipient(), e.toString());
+        }
 
         // metrics
         metricsService.incrementSendSuccess(ctx.getChannel(), ctx.getMethod());
@@ -155,11 +164,11 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
     }
 
     private void recordFailure(SendContext ctx, String errorMessage) {
-//        try {
-//            smsMessageStore.storeFailed(ctx.getRecipient(), "{\"ok\":false,\"error\":\"" + errorMessage + "\"}");
-//        } catch (Exception e) {
-//            log.warn("[{}] failed to persist error response: {}", ctx.getRecipient(), e.toString());
-//        }
+        try {
+            smsMessageStore.storeFailed(ctx.getRecipient(), errorMessage);
+        } catch (Exception e) {
+            log.warn("[{}] failed to persist error response: {}", ctx.getRecipient(), e.toString());
+        }
 
         // metrics
         metricsService.incrementSendFailure(ctx.getChannel(), ctx.getMethod(), errorMessage);

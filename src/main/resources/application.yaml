@@ -49,7 +49,7 @@ whatsapp:
     maxBackoff: 30
   contentBasedResource:
     text:
-      isEnabled: false
+      isEnabled: true
     image:
       isEnabled: false
     video:
@@ -60,7 +60,7 @@ sms:
   maxConcurrency: 8
   contentBasedResource:
     text:
-      isEnabled: false
+      isEnabled: true
   retry:
     maxRetryCount: 4
     initialBackoff: 1

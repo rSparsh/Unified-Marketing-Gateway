@@ -28,10 +28,14 @@ public class SendNotificationController {
     @Autowired
     SmsRequestProcessor smsRequestProcessor;
 
-    @PostMapping("/sendNotification")
+    @PostMapping(
+            value = "/sendNotification",
+            consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE,
+            produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE
+    )
     public SendNotificationResponse sendNotification(@RequestHeader ClientType clientType,
             @RequestBody SendNotificationRequest request){
-        log.info("SendNotificationController::sendNotification request: {}", request);
+        log.debug("SendNotificationController::sendNotification request: {}", request);
 
         SendNotificationResponse response = SendNotificationResponse.builder()
                 .responseStatus("400")
