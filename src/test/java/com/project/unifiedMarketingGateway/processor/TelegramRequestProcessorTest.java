@@ -76,7 +76,7 @@ public class TelegramRequestProcessorTest {
 
         when(requestValidator.validateSendNotificationRequest(request))
                 .thenReturn(validationErrors);
-        when(responseBuilder.buildFailureResponse("Request Validation Failed: [Invalid chat ID]"))
+        when(responseBuilder.buildFailureResponse("Request Validation Failed: [Invalid chat ID]", null))
                 .thenReturn(SendNotificationResponse.builder()
                         .responseStatus("400")
                         .customMessage("Request Validation Failed: [Invalid chat ID]")
@@ -85,7 +85,7 @@ public class TelegramRequestProcessorTest {
         SendNotificationResponse response = telegramRequestProcessor.processNotificationRequest(request);
 
         // Assert
-        verify(responseBuilder).buildFailureResponse("Request Validation Failed: " + validationErrors);
+        verify(responseBuilder).buildFailureResponse("Request Validation Failed: " + validationErrors, null);
         assertEquals("Request Validation Failed: [Invalid chat ID]", response.getCustomMessage());
     }
 
@@ -95,7 +95,7 @@ public class TelegramRequestProcessorTest {
         SendNotificationResponse successResponse = getSuccessResponse();
 
         when(requestValidator.validateSendNotificationRequest(any())).thenReturn(Collections.emptyList());
-        when(responseBuilder.buildSuccessResponse(anyString())).thenReturn(successResponse);
+        when(responseBuilder.buildSuccessResponse(anyString(), anyString())).thenReturn(successResponse);
         when(payloadBuilder.buildTextPayload(eq("111"), eq("hello"))).thenReturn(Map.of("chat_id", "111", "text", "hello"));
         when(payloadBuilder.buildTextPayload(eq("222"), eq("hello"))).thenReturn(Map.of("chat_id", "222", "text", "hello"));
         when(reactiveRetryHandler.withRetry(any()))
@@ -112,7 +112,7 @@ public class TelegramRequestProcessorTest {
 
         // Assert returned success
         assertSame(successResponse, resp);
-        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"));
+        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"), anyString());
     }
 
 
@@ -123,7 +123,7 @@ public class TelegramRequestProcessorTest {
         SendNotificationResponse successResponse = getSuccessResponse();
 
         when(requestValidator.validateSendNotificationRequest(any())).thenReturn(Collections.emptyList());
-        when(responseBuilder.buildSuccessResponse(anyString())).thenReturn(successResponse);
+        when(responseBuilder.buildSuccessResponse(anyString(), anyString())).thenReturn(successResponse);
         when(payloadBuilder.buildImagePayload(eq("111"), eq("https://example.com/img.jpg"), eq("caption")))
                 .thenReturn(Map.of("chat_id", "111", "photo", "https://example.com/img.jpg", "caption", "caption"));
         when(payloadBuilder.buildImagePayload(eq("222"), eq("https://example.com/img.jpg"), eq("caption")))
@@ -144,7 +144,7 @@ public class TelegramRequestProcessorTest {
 
         // Assert returned success
         assertSame(successResponse, resp);
-        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"));
+        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"), anyString());
     }
 
     @Test
@@ -153,7 +153,7 @@ public class TelegramRequestProcessorTest {
         SendNotificationResponse successResponse = getSuccessResponse();
 
         when(requestValidator.validateSendNotificationRequest(any())).thenReturn(Collections.emptyList());
-        when(responseBuilder.buildSuccessResponse(anyString())).thenReturn(successResponse);
+        when(responseBuilder.buildSuccessResponse(anyString(), anyString())).thenReturn(successResponse);
         when(payloadBuilder.buildVideoPayload(eq("111"), eq("https://example.com/vid.mp4"), eq("vcaption")))
                 .thenReturn(Map.of("chat_id", "111", "video", "https://example.com/vid.mp4", "caption", "vcaption"));
         when(payloadBuilder.buildVideoPayload(eq("222"), eq("https://example.com/vid.mp4"), eq("vcaption")))
@@ -176,7 +176,7 @@ public class TelegramRequestProcessorTest {
 
         // Assert returned success
         assertSame(successResponse, resp);
-        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"));
+        verify(responseBuilder, times(1)).buildSuccessResponse(contains("added to queue"), anyString());
 
     }
 

@@ -1,4 +1,4 @@
-package com.project.unifiedMarketingGateway.dto;
+package com.project.unifiedMarketingGateway.metrics.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -2,8 +2,10 @@ package com.project.unifiedMarketingGateway.webhook;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.unifiedMarketingGateway.enums.DeliveryStatus;
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
+import com.project.unifiedMarketingGateway.processor.DeliveryStateService;
 import com.project.unifiedMarketingGateway.store.messageStore.WhatsappMessageStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,8 @@ public class WhatsappWebhookService {
     @Autowired WhatsappMessageStore messageStore;
     @Autowired
     MetricsService metricsService;
+    @Autowired
+    DeliveryStateService deliveryStateService;
 
     public void processWebhookPayload(Map<String, Object> rawPayload) {
         JsonNode root = objectMapper.valueToTree(rawPayload);
@@ -69,6 +73,22 @@ public class WhatsappWebhookService {
                 messageId, recipientId, statusStr, errorCode, errorDetails);
 
         messageStore.updateStatus(messageId, recipientId, mappedStatus, errorCode, errorDetails);
+        switch (mappedStatus) {
+            case SENT ->
+                    deliveryStateService.updateFromWebhook(messageId, DeliveryStatus.SENT);
+
+            case DELIVERED ->
+                    deliveryStateService.updateFromWebhook(messageId, DeliveryStatus.DELIVERED);
+
+            case READ ->
+                    deliveryStateService.updateFromWebhook(messageId, DeliveryStatus.READ);
+
+            case FAILED ->
+                    deliveryStateService.markFailedByProviderMessageId(
+                            messageId,
+                            errorDetails);
+        }
+
     }
 
     private String getText(JsonNode node, String fieldName) {

@@ -8,4 +8,5 @@ import lombok.Data;
 public class SendNotificationResponse {
     String responseStatus;
     String customMessage;
+    String requestId;
 }
