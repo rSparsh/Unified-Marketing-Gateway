@@ -8,6 +8,7 @@ import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
 import com.project.unifiedMarketingGateway.models.SendNotificationResponse;
+import com.project.unifiedMarketingGateway.processor.DeliveryStateService;
 import com.project.unifiedMarketingGateway.processor.IdempotencyService;
 import com.project.unifiedMarketingGateway.processor.RequestProcessorInterface;
 import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
@@ -24,14 +25,12 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
 import static com.project.unifiedMarketingGateway.enums.ClientType.TELEGRAM;
+import static com.project.unifiedMarketingGateway.enums.ClientType.WHATSAPP;
 
 @Slf4j
 @Service
@@ -58,6 +57,8 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     MetricsService metricsService;
     @Autowired
     IdempotencyService idempotencyService;
+    @Autowired
+    DeliveryStateService deliveryStateService;
 
     @Value("${telegram.maxConcurrency:5}")
     private int maxConcurrency;
@@ -88,6 +89,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         String imageCaption = sendNotificationRequest.getImageCaption();
         String videoUrl = sendNotificationRequest.getVideoUrl();
         String videoCaption = sendNotificationRequest.getVideoCaption();
+        String requestId = UUID.randomUUID().toString();
 
         boolean allQueued = true;
         List<String> mediaDisabledErrorList = new ArrayList<>();
@@ -98,7 +100,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
             switch (mediaType) {
                 case TEXT -> {
                     if(isTextEnabled)
-                        ok = prepareAndSendTextMedia(recipientList, textMessage);
+                        ok = prepareAndSendTextMedia(recipientList, textMessage, requestId);
                     else {
                         mediaDisabledErrorList.add(TEXT_MEDIA_DISABLED_ERROR);
                         ok = false;
@@ -106,7 +108,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                 }
                 case IMAGE -> {
                     if(isImageEnabled)
-                        ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
+                        ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption, requestId);
                     else {
                         mediaDisabledErrorList.add(IMAGE_MEDIA_DISABLED_ERROR);
                         ok = false;
@@ -114,7 +116,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                 }
                 case VIDEO -> {
                     if(isVideoEnabled)
-                        ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
+                        ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption, requestId);
                     else {
                         mediaDisabledErrorList.add(VIDEO_MEDIA_DISABLED_ERROR);
                         ok = false;
@@ -134,7 +136,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
 
     private boolean prepareAndSendMedia(List<String> recipientList,
             Function<String, Map<String, Object>> payloadForChat,
-            String method) {
+            String method, String requestId) {
         int concurrency = Math.min(maxConcurrency, recipientList.size());
 
         Flux.fromIterable(recipientList)
@@ -142,7 +144,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                 .filter(id -> !id.isEmpty())
                 .flatMap(chatId -> {
                     Map<String, Object> payload = payloadForChat.apply(chatId);
-                    return executeRequestReactive(chatId, payload, method);
+                    return executeRequestReactive(chatId, payload, method, requestId);
                 }, concurrency)
                 .doOnSubscribe(s -> log.info("Dispatching {} sends (method={} concurrency={})",
                         recipientList.size(), method, concurrency))
@@ -161,34 +163,20 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         return true;
     }
 
-    private Mono<SendResultDTO> executeRequestReactive(String chatId, Map<String, Object> payload, String method) {
-        SendContext ctx = SendContext.builder()
-                .channel(TELEGRAM.getValue())
-                .method(method)
-                .recipient(chatId)
-                .requestId(UUID.randomUUID().toString())
-                .build();
-
-        if (!idempotencyService.tryStart(
-                ctx.getRequestId(),
-                ctx.getChannel(),
-                ctx.getRecipient(),
-                ctx.getMethod()
-        )) {
-            log.info("[{}] Duplicate request blocked", ctx.getRequestId());
+    private Mono<SendResultDTO> executeRequestReactive(String chatId, Map<String, Object> payload, String method, String requestId) {
+        Optional<SendContext> ctxOpt = preSendChecksAndRecords(chatId, method, requestId);
+        if (ctxOpt.isEmpty()) {
             return Mono.just(
                     new SendResultDTO(
-                            ctx.getRecipient(),
+                            chatId,
                             true,
                             "DUPLICATE",
                             null
                     )
             );
         }
+        SendContext ctx = ctxOpt.get();
 
-            metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
-        metricsService.incrementInFlight(ctx.getChannel());
-        ctx.markStart();
 
         Mono<String> httpCall = reactiveRetryHandler.withRetry(() -> telegramHttpConnector.sendMarketingRequest(method, payload));
 
@@ -208,22 +196,50 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                 );
     }
 
-    private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage) {
+    private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage, String requestId) {
         return prepareAndSendMedia(recipientList,
                 chatId -> payloadBuilder.buildTextPayload(chatId, textMessage),
-                TELEGRAM_SEND_MESSAGE_METHOD);
+                TELEGRAM_SEND_MESSAGE_METHOD, requestId);
     }
 
-    private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption) {
+    private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption, String requestId) {
         return prepareAndSendMedia(recipientList,
                 chatId -> payloadBuilder.buildImagePayload(chatId, imageUrl, imageCaption),
-                TELEGRAM_SEND_PHOTO_METHOD);
+                TELEGRAM_SEND_PHOTO_METHOD, requestId);
     }
 
-    private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption) {
+    private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption, String requestId) {
         return prepareAndSendMedia(recipientList,
                 chatId -> payloadBuilder.buildVideoPayload(chatId, videoUrl, videoCaption),
-                TELEGRAM_SEND_VIDEO_METHOD);
+                TELEGRAM_SEND_VIDEO_METHOD, requestId);
+    }
+
+    private Optional<SendContext> preSendChecksAndRecords(String chatId, String method, String requestId) {
+        SendContext ctx = SendContext.builder()
+                .channel(TELEGRAM.getValue())
+                .method(method)
+                .recipient(chatId)
+                .requestId(requestId)
+                .build();
+
+        boolean allowed = idempotencyService.tryStart(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
+        if (!allowed) {
+            log.info("[{}] Duplicate request blocked for {}", ctx.getRequestId(), chatId);
+            return Optional.empty();
+        }
+
+        metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
+        metricsService.incrementInFlight(ctx.getChannel());
+        deliveryStateService.markQueued(ctx);
+        ctx.markStart();
+
+        return Optional.of(ctx);
     }
 
     private void recordSuccess(SendContext ctx, String body) {
@@ -243,6 +259,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         metricsService.incrementSendSuccess(ctx.getChannel(), ctx.getMethod());
         metricsService.recordHttpLatency(ctx.getChannel(), ctx.getMethod(), ctx.elapsed());
         metricsService.decrementInFlight(ctx.getChannel());
+        deliveryStateService.markSent(ctx, ctx.getRecipient());
     }
 
     private void recordFailure(SendContext ctx, String errorMessage) {
@@ -263,5 +280,6 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         metricsService.incrementSendFailure(ctx.getChannel(), ctx.getMethod(), errorMessage);
         metricsService.recordHttpLatency(ctx.getChannel(), ctx.getMethod(), ctx.elapsed());
         metricsService.decrementInFlight(ctx.getChannel());
+        deliveryStateService.markFailed(ctx, errorMessage);
     }
 }

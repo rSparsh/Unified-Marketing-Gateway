@@ -10,6 +10,7 @@ import com.project.unifiedMarketingGateway.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
+import com.project.unifiedMarketingGateway.processor.DeliveryStateService;
 import com.project.unifiedMarketingGateway.processor.IdempotencyService;
 import com.project.unifiedMarketingGateway.store.messageStore.WhatsappMessageStore;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
@@ -28,15 +29,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
 import static com.project.unifiedMarketingGateway.constants.Constants.VIDEO_MEDIA_DISABLED_ERROR;
+import static com.project.unifiedMarketingGateway.enums.ClientType.SMS;
 import static com.project.unifiedMarketingGateway.enums.ClientType.WHATSAPP;
+import static com.project.unifiedMarketingGateway.enums.MediaType.TEXT;
 
 @Service
 @Slf4j
@@ -60,6 +60,8 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     MetricsService metricsService;
     @Autowired
     IdempotencyService idempotencyService;
+    @Autowired
+    DeliveryStateService deliveryStateService;
 
     @Value("${whatsapp.maxConcurrency:5}")
     private int maxConcurrency;
@@ -98,6 +100,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         String imageCaption = request.getImageCaption();
         String videoUrl     = request.getVideoUrl();
         String videoCaption = request.getVideoCaption();
+        String requestId = UUID.randomUUID().toString();
 
         boolean anyQueued  = false;
         boolean allQueued  = true;
@@ -108,7 +111,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
             switch (mediaType) {
                 case TEXT -> {
                     if(isTextEnabled)
-                        ok = prepareAndSendTextMedia(recipientList, textMessage);
+                        ok = prepareAndSendTextMedia(recipientList, textMessage, requestId);
                     else {
                         mediaDisabledErrorList.add(TEXT_MEDIA_DISABLED_ERROR);
                         ok = false;
@@ -116,7 +119,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
                 }
                 case IMAGE -> {
                     if(isImageEnabled)
-                        ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption);
+                        ok = prepareAndSendImageMedia(recipientList, imageUrl, imageCaption, requestId);
                     else {
                         mediaDisabledErrorList.add(IMAGE_MEDIA_DISABLED_ERROR);
                         ok = false;
@@ -124,7 +127,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
                 }
                 case VIDEO -> {
                     if(isVideoEnabled)
-                        ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption);
+                        ok = prepareAndSendVideoMedia(recipientList, videoUrl, videoCaption, requestId);
                     else {
                         mediaDisabledErrorList.add(VIDEO_MEDIA_DISABLED_ERROR);
                         ok = false;
@@ -145,36 +148,21 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         return responseBuilder.buildSuccessResponse("Notification request added to queue successfully for WhatsApp.");
     }
 
-    public Mono<SendResultDTO> executeRequestReactive(String chatID,
+    private Mono<SendResultDTO> executeRequestReactive(String chatID,
             Map<String, Object> payload,
-            MediaType mediaType) {
-        SendContext ctx = SendContext.builder()
-                .channel(WHATSAPP.getValue())
-                .method(mediaType.getValue())
-                .recipient(chatID)
-                .requestId(UUID.randomUUID().toString())
-                .build();
-
-        if (!idempotencyService.tryStart(
-                ctx.getRequestId(),
-                ctx.getChannel(),
-                ctx.getRecipient(),
-                ctx.getMethod()
-        )) {
-            log.info("[{}] Duplicate request blocked", ctx.getRequestId());
+            MediaType mediaType, String requestId) {
+        Optional<SendContext> ctxOpt = preSendChecksAndRecords(chatID, mediaType.getValue(), requestId);
+        if (ctxOpt.isEmpty()) {
             return Mono.just(
                     new SendResultDTO(
-                            ctx.getRecipient(),
+                            chatID,
                             true,
                             "DUPLICATE",
                             null
                     )
             );
         }
-
-        metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
-        metricsService.incrementInFlight(ctx.getChannel());
-        ctx.markStart();
+        SendContext ctx = ctxOpt.get();
 
         Mono<String> httpCall = reactiveRetryHandler.withRetry(
                 () -> whatsappHttpConnector.sendMarketingRequest(MESSAGES, payload)
@@ -183,7 +171,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         return httpCall
                 .publishOn(Schedulers.boundedElastic())
                 .flatMap(body -> Mono.fromCallable(() -> {
-                            saveResponseToDB(body, chatID, mediaType);
+                            saveResponseToDB(ctx, body, chatID, mediaType);
                             recordSuccess(ctx, body);
                             return new SendResultDTO(chatID, true, body, null);
                         })
@@ -197,7 +185,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     }
 
     private boolean prepareAndSendMedia(List<String> recipientList,
-            Function<String, Map<String, Object>> payloadForRecipient, MediaType mediaType) {
+            Function<String, Map<String, Object>> payloadForRecipient, MediaType mediaType, String requestId) {
         if (recipientList == null || recipientList.isEmpty()) {
             log.warn("No recipients provided for WhatsApp; nothing queued");
             return false;
@@ -210,7 +198,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
                 .filter(id -> !id.isEmpty())
                 .flatMap(chatID -> {
                     Map<String, Object> payload = payloadForRecipient.apply(chatID);
-                    return executeRequestReactive(chatID, payload, mediaType);
+                    return executeRequestReactive(chatID, payload, mediaType, requestId);
                 }, concurrency)
                 .doOnSubscribe(s -> log.info("Dispatching {} WhatsApp sends (concurrency={})", recipientList.size(), concurrency))
                 .subscribe(
@@ -228,28 +216,28 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         return true;
     }
 
-    private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage) {
+    private boolean prepareAndSendTextMedia(List<String> recipientList, String textMessage, String requestId) {
         return prepareAndSendMedia(
                 recipientList,
-                chatID -> payloadBuilder.buildTextPayload(chatID, textMessage), MediaType.TEXT
+                chatID -> payloadBuilder.buildTextPayload(chatID, textMessage), MediaType.TEXT, requestId
         );
     }
 
-    private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption) {
+    private boolean prepareAndSendImageMedia(List<String> recipientList, String imageUrl, String imageCaption, String requestId) {
         return prepareAndSendMedia(
                 recipientList,
-                chatID -> payloadBuilder.buildImagePayload(chatID, imageUrl, imageCaption), MediaType.IMAGE
+                chatID -> payloadBuilder.buildImagePayload(chatID, imageUrl, imageCaption), MediaType.IMAGE, requestId
         );
     }
 
-    private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption) {
+    private boolean prepareAndSendVideoMedia(List<String> recipientList, String videoUrl, String videoCaption, String requestId) {
         return prepareAndSendMedia(
                 recipientList,
-                chatID -> payloadBuilder.buildVideoPayload(chatID, videoUrl, videoCaption), MediaType.VIDEO
+                chatID -> payloadBuilder.buildVideoPayload(chatID, videoUrl, videoCaption), MediaType.VIDEO, requestId
         );
     }
 
-    private void saveResponseToDB(String body, String chatID, MediaType mediaType)
+    private void saveResponseToDB(SendContext ctx, String body, String chatID, MediaType mediaType)
     {
         String waMessageId = extractWhatsAppMessageId(body);
         if (waMessageId != null) {
@@ -262,6 +250,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
                     .status(WhatsappMessageStatus.SENT)
                     .build();
             messageStore.saveOutbound(msg);
+            deliveryStateService.markSent(ctx, waMessageId);
         } else {
             log.warn("[{}] WA send success but no message id parsed", chatID);
         }
@@ -272,7 +261,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode arr = root.get("messages");
-            if (arr != null && arr.isArray() && arr.size() > 0) {
+            if (arr != null && arr.isArray() && !arr.isEmpty()) {
                 JsonNode first = arr.get(0);
                 JsonNode idNode = first.get("id");
                 if (idNode != null && !idNode.isNull()) {
@@ -283,6 +272,34 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
             log.warn("Failed to parse WA message id from response: {}", e.toString());
         }
         return null;
+    }
+
+    private Optional<SendContext> preSendChecksAndRecords(String chatId, String method, String requestId) {
+        SendContext ctx = SendContext.builder()
+                .channel(WHATSAPP.getValue())
+                .method(method)
+                .recipient(chatId)
+                .requestId(requestId)
+                .build();
+
+        boolean allowed = idempotencyService.tryStart(
+                ctx.getRequestId(),
+                ctx.getChannel(),
+                ctx.getRecipient(),
+                ctx.getMethod()
+        );
+
+        if (!allowed) {
+            log.info("[{}] Duplicate request blocked for {}", ctx.getRequestId(), chatId);
+            return Optional.empty();
+        }
+
+        metricsService.incrementSendAttempt(ctx.getChannel(), ctx.getMethod());
+        metricsService.incrementInFlight(ctx.getChannel());
+        deliveryStateService.markQueued(ctx);
+        ctx.markStart();
+
+        return Optional.of(ctx);
     }
 
     private void recordSuccess(SendContext ctx, String body) {
@@ -324,6 +341,7 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         metricsService.incrementSendFailure(ctx.getChannel(), ctx.getMethod(), errorMessage);
         metricsService.recordHttpLatency(ctx.getChannel(), ctx.getMethod(), ctx.elapsed());
         metricsService.decrementInFlight(ctx.getChannel());
+        deliveryStateService.markFailed(ctx, errorMessage);
     }
 }
 
