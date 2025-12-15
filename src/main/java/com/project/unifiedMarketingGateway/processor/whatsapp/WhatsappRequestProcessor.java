@@ -6,7 +6,7 @@ import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuil
 import com.project.unifiedMarketingGateway.builders.WhatsappPayloadBuilder;
 import com.project.unifiedMarketingGateway.connectors.WhatsappHttpConnector;
 import com.project.unifiedMarketingGateway.contexts.SendContext;
-import com.project.unifiedMarketingGateway.dto.SendResultDTO;
+import com.project.unifiedMarketingGateway.metrics.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.enums.WhatsappMessageStatus;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
@@ -34,9 +34,7 @@ import java.util.function.Function;
 
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
 import static com.project.unifiedMarketingGateway.constants.Constants.VIDEO_MEDIA_DISABLED_ERROR;
-import static com.project.unifiedMarketingGateway.enums.ClientType.SMS;
 import static com.project.unifiedMarketingGateway.enums.ClientType.WHATSAPP;
-import static com.project.unifiedMarketingGateway.enums.MediaType.TEXT;
 
 @Service
 @Slf4j
@@ -79,21 +77,13 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
 
     @Override
     public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest request) {
-        // 1. Validation
         List<String> errors = requestValidator.validateSendNotificationRequest(request);
         if (!errors.isEmpty()) {
-            return responseBuilder.buildFailureResponse("Request Validation Failed: " + errors);
+            return responseBuilder.buildFailureResponse("Request Validation Failed: " + errors, null);
         }
 
         List<String> recipientList = request.getRecipientList();
         List<MediaType> mediaTypeList = request.getMediaTypeList();
-
-        if (recipientList == null || recipientList.isEmpty()) {
-            return responseBuilder.buildFailureResponse("Recipient list is empty for WhatsApp.");
-        }
-        if (mediaTypeList == null || mediaTypeList.isEmpty()) {
-            return responseBuilder.buildFailureResponse("No media types specified for WhatsApp.");
-        }
 
         String textMessage  = request.getTextMessage();
         String imageUrl     = request.getImageUrl();
@@ -139,13 +129,13 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
         }
 
         if (!anyQueued) {
-            return responseBuilder.buildFailureResponse("Notification request couldn't be processed for WhatsApp." + mediaDisabledErrorList.toString());
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed for WhatsApp." + mediaDisabledErrorList.toString(), requestId);
         }
         if (!allQueued) {
-            return responseBuilder.buildFailureResponse("Notification request was only partially queued for WhatsApp." + mediaDisabledErrorList.toString());
+            return responseBuilder.buildFailureResponse("Notification request was only partially queued for WhatsApp." + mediaDisabledErrorList.toString(), requestId);
         }
 
-        return responseBuilder.buildSuccessResponse("Notification request added to queue successfully for WhatsApp.");
+        return responseBuilder.buildSuccessResponse("Notification request added to queue successfully for WhatsApp.", requestId);
     }
 
     private Mono<SendResultDTO> executeRequestReactive(String chatID,

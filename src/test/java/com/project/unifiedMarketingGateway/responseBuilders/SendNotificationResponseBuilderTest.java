@@ -13,18 +13,20 @@ public class SendNotificationResponseBuilderTest {
     @Test
     public void testBuildSuccessResponse() {
         String expectedMessage = "Test success message";
-        SendNotificationResponse response = responseBuilder.buildSuccessResponse(expectedMessage);
+        SendNotificationResponse response = responseBuilder.buildSuccessResponse(expectedMessage, "12345");
 
         assertEquals("200", response.getResponseStatus());
         assertEquals(expectedMessage, response.getCustomMessage());
+        assertEquals("12345", response.getRequestId());
     }
 
     @Test
     public void testBuildFailureResponse() {
         String expectedMessage = "Test failure message";
-        SendNotificationResponse response = responseBuilder.buildFailureResponse(expectedMessage);
+        SendNotificationResponse response = responseBuilder.buildFailureResponse(expectedMessage, "12345");
 
         assertEquals("400", response.getResponseStatus());
         assertEquals(expectedMessage, response.getCustomMessage());
+        assertEquals("12345", response.getRequestId());
     }
 }

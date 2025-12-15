@@ -3,7 +3,7 @@ package com.project.unifiedMarketingGateway.processor.telegram;
 import com.project.unifiedMarketingGateway.builders.TelegramPayloadBuilder;
 import com.project.unifiedMarketingGateway.connectors.TelegramHttpConnector;
 import com.project.unifiedMarketingGateway.contexts.SendContext;
-import com.project.unifiedMarketingGateway.dto.SendResultDTO;
+import com.project.unifiedMarketingGateway.metrics.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.enums.MediaType;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
 import com.project.unifiedMarketingGateway.models.SendNotificationRequest;
@@ -15,7 +15,6 @@ import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuil
 import com.project.unifiedMarketingGateway.store.responseStore.TelegramResponseStore;
 import com.project.unifiedMarketingGateway.retryHandler.TelegramReactiveRetryHandler;
 import com.project.unifiedMarketingGateway.validators.TelegramSendNotificationRequestValidator;
-import io.micrometer.core.instrument.Timer;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +29,6 @@ import java.util.function.Function;
 
 import static com.project.unifiedMarketingGateway.constants.Constants.*;
 import static com.project.unifiedMarketingGateway.enums.ClientType.TELEGRAM;
-import static com.project.unifiedMarketingGateway.enums.ClientType.WHATSAPP;
 
 @Slf4j
 @Service
@@ -78,7 +76,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
     public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest sendNotificationRequest) {
         List<String> validationErrorList = requestValidator.validateSendNotificationRequest(sendNotificationRequest);
         if (!validationErrorList.isEmpty()) {
-            return responseBuilder.buildFailureResponse("Request Validation Failed: " + validationErrorList.toString());
+            return responseBuilder.buildFailureResponse("Request Validation Failed: " + validationErrorList.toString(), null);
         }
 
         List<String> recipientList = sendNotificationRequest.getRecipientList();
@@ -128,9 +126,9 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         }
 
         if (allQueued) {
-            return responseBuilder.buildSuccessResponse("Notification request added to queue successfully");
+            return responseBuilder.buildSuccessResponse("Notification request added to queue successfully", requestId);
         } else {
-            return responseBuilder.buildFailureResponse("Notification request couldn't be processed." + mediaDisabledErrorList.toString());
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed." + mediaDisabledErrorList.toString(), requestId);
         }
     }
 

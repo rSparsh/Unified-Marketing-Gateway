@@ -8,11 +8,22 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 @Service
 public class DeliveryStateService {
 
     @Autowired
     DeliveryStateRepository repository;
+
+    private static final Map<DeliveryStatus, Integer> PRECEDENCE = Map.of(
+            DeliveryStatus.CREATED, 0,
+            DeliveryStatus.QUEUED, 1,
+            DeliveryStatus.SENT, 2,
+            DeliveryStatus.DELIVERED, 3,
+            DeliveryStatus.READ, 4,
+            DeliveryStatus.FAILED, -1 // terminal but special
+    );
 
     @Transactional
     public void markQueued(SendContext ctx) {
@@ -61,24 +72,6 @@ public class DeliveryStateService {
     }
 
     @Transactional
-    public void markDeliveredByProviderMessageId(String providerMessageId) {
-        repository.findByProviderMessageId(providerMessageId)
-                .ifPresent(entity -> {
-                    entity.setStatus(DeliveryStatus.DELIVERED);
-                    entity.setUpdatedAtEpochMillis(System.currentTimeMillis());
-                });
-    }
-
-    @Transactional
-    public void markReadByProviderMessageId(String providerMessageId) {
-        repository.findByProviderMessageId(providerMessageId)
-                .ifPresent(entity -> {
-                    entity.setStatus(DeliveryStatus.READ);
-                    entity.setUpdatedAtEpochMillis(System.currentTimeMillis());
-                });
-    }
-
-    @Transactional
     public void markFailedByProviderMessageId(
             String providerMessageId,
             String reason
@@ -87,6 +80,26 @@ public class DeliveryStateService {
                 .ifPresent(entity -> {
                     entity.setStatus(DeliveryStatus.FAILED);
                     entity.setFailureReason(reason);
+                    entity.setUpdatedAtEpochMillis(System.currentTimeMillis());
+                });
+    }
+
+    @Transactional
+    public void updateFromWebhook(
+            String providerMessageId,
+            DeliveryStatus incomingStatus
+    ) {
+        repository.findByProviderMessageId(providerMessageId)
+                .ifPresent(entity -> {
+
+                    DeliveryStatus current = entity.getStatus();
+
+                    // Ignore duplicates or backward transitions
+                    if (PRECEDENCE.get(incomingStatus) <= PRECEDENCE.get(current)) {
+                        return;
+                    }
+
+                    entity.setStatus(incomingStatus);
                     entity.setUpdatedAtEpochMillis(System.currentTimeMillis());
                 });
     }

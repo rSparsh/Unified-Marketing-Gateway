@@ -23,5 +23,7 @@ public interface DeliveryStateRepository
 
     Optional<DeliveryStateEntity>
     findByProviderMessageId(String providerMessageId);
+
+    List<DeliveryStateEntity> findByRequestId(String requestId);
 }
 

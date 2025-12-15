@@ -3,7 +3,7 @@ package com.project.unifiedMarketingGateway.processor.sms;
 import com.project.unifiedMarketingGateway.builders.SendNotificationResponseBuilder;
 import com.project.unifiedMarketingGateway.connectors.TwilioSmsConnector;
 import com.project.unifiedMarketingGateway.contexts.SendContext;
-import com.project.unifiedMarketingGateway.dto.SendResultDTO;
+import com.project.unifiedMarketingGateway.metrics.dto.SendResultDTO;
 import com.project.unifiedMarketingGateway.processor.DeliveryStateService;
 import com.project.unifiedMarketingGateway.processor.IdempotencyService;
 import com.project.unifiedMarketingGateway.store.messageStore.SmsMessageStore;
@@ -18,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ObjectUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -61,7 +60,7 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
 
         List<String> validationErrorList = requestValidator.validateSendNotificationRequest(sendNotificationRequest);
         if (!validationErrorList.isEmpty()) {
-            return responseBuilder.buildFailureResponse("Request Validation Failed: " + validationErrorList.toString());
+            return responseBuilder.buildFailureResponse("Request Validation Failed: " + validationErrorList.toString(), null);
         }
 
         List<String> recipientList = sendNotificationRequest.getRecipientList();
@@ -77,9 +76,9 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
             mediaDisabledErrorList.add(TEXT_MEDIA_DISABLED_ERROR);
 
         if (allQueued) {
-            return responseBuilder.buildSuccessResponse("Notification request added to queue successfully");
+            return responseBuilder.buildSuccessResponse("Notification request added to queue successfully", requestId);
         } else {
-            return responseBuilder.buildFailureResponse("Notification request couldn't be processed." + mediaDisabledErrorList.toString());
+            return responseBuilder.buildFailureResponse("Notification request couldn't be processed." + mediaDisabledErrorList.toString(), requestId);
         }
     }
 
