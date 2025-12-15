@@ -11,7 +11,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
@@ -78,3 +78,10 @@ management:
     export:
       prometheus:
         enabled: true
+
+#Add only DeliveryReconciliation related configs below this line
+reconciliation:
+  timeout:
+    queued: 5
+    sent: 30
+    delivered: 1440
