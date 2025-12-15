@@ -144,7 +144,7 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
                     Map<String, Object> payload = payloadForChat.apply(chatId);
                     return executeRequestReactive(chatId, payload, method, requestId);
                 }, concurrency)
-                .doOnSubscribe(s -> log.info("Dispatching {} sends (method={} concurrency={})",
+                .doOnSubscribe(s -> log.debug("Dispatching {} sends (method={} concurrency={})",
                         recipientList.size(), method, concurrency))
                 .subscribe(
                         result -> {

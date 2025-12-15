@@ -28,6 +28,7 @@ public class MetricsService {
     public static final String METRIC_HTTP_LATENCY = "umg.http.latency";
     public static final String METRIC_WEBHOOK_EVENTS = "umg.webhook.events";
     public static final String METRIC_IN_FLIGHT = "umg.inflight.requests";
+    public static final String METRIC_RECONCILIATION = "umg.inflight.reconciliation";
 
     private final Map<String, AtomicInteger> inFlightByChannel = new ConcurrentHashMap<>();
 
@@ -89,6 +90,11 @@ public class MetricsService {
 
     public void incrementWebhookEvent(String eventType) {
         registry.counter(METRIC_WEBHOOK_EVENTS, "event", safe(eventType)).increment();
+    }
+
+    public void incrementReconciliation(String channel, String resultStatus)
+    {
+        registry.counter(METRIC_RECONCILIATION, TAG_CHANNEL, safe(channel), TAG_STATUS, safe(resultStatus)).increment();
     }
 
     private String safe(String s) {

@@ -18,7 +18,7 @@ public class TelegramResponseStore {
     public void storeResponse(String recipientId, String responseBody) {
         if (recipientId == null) recipientId = "unknown";
         responses.put(recipientId, responseBody == null ? "" : responseBody);
-        log.info("Stored response for {} (len={})", recipientId, responseBody == null ? 0 : responseBody.length());
+        log.debug("Stored response for {} (len={})", recipientId, responseBody == null ? 0 : responseBody.length());
     }
 
     //TODO: use to provide response status for chat-id
