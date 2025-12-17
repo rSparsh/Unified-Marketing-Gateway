@@ -54,6 +54,8 @@ whatsapp:
       isEnabled: false
     video:
       isEnabled: false
+  fallbackRouting:
+    isEnabled: false
 
 #Add only SMS related configs below this line
 sms:

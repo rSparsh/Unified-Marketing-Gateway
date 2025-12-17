@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.project.unifiedMarketingGateway.constants.Constants.SEND_SMS_METHOD;
 import static com.project.unifiedMarketingGateway.constants.Constants.TEXT_MEDIA_DISABLED_ERROR;
 import static com.project.unifiedMarketingGateway.enums.ClientType.SMS;
 import static com.project.unifiedMarketingGateway.enums.MediaType.TEXT;
@@ -164,7 +165,7 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
         SendContext ctx = SendContext.builder()
                 .channel(SMS.getValue())
                 .method(TEXT.getValue())
-                .method("send_sms")
+                .method(SEND_SMS_METHOD)
                 .recipient(chatId)
                 .requestId(requestId)
                 .build();
@@ -208,6 +209,8 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
         metricsService.incrementSendSuccess(ctx.getChannel(), ctx.getMethod());
         metricsService.recordHttpLatency(ctx.getChannel(), ctx.getMethod(), ctx.elapsed());
         metricsService.decrementInFlight(ctx.getChannel());
+
+        deliveryStateService.markSent(ctx, sid);
     }
 
     private void recordFailure(SendContext ctx, String errorMessage) {
@@ -230,5 +233,17 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
         metricsService.decrementInFlight(ctx.getChannel());
         deliveryStateService.markFailed(ctx, errorMessage);
     }
+
+    public void processFallback(
+            String requestId,
+            String recipient
+    ) {
+        executeRequestReactive(
+                recipient,
+                "Fallback message",
+                requestId
+        ).subscribe();
+    }
+
 }
 
