@@ -4,6 +4,7 @@ import com.project.unifiedMarketingGateway.entity.DeliveryStateEntity;
 import com.project.unifiedMarketingGateway.enums.DeliveryStatus;
 import com.project.unifiedMarketingGateway.enums.ReconciliationResult;
 import com.project.unifiedMarketingGateway.metrics.MetricsService;
+import com.project.unifiedMarketingGateway.processor.FallbackRouter;
 import com.project.unifiedMarketingGateway.repository.DeliveryStateRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +13,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.List;
 
 @Slf4j
 @Component
@@ -21,6 +21,8 @@ public class DeliveryReconciliationJob {
     @Autowired DeliveryStateRepository repository;
     @Autowired
     MetricsService metricsService;
+    @Autowired
+    FallbackRouter fallbackRouter;
 
     private final long queuedTimeoutMs;
     private final long sentTimeoutMs;
@@ -100,6 +102,7 @@ public class DeliveryReconciliationJob {
                 e.getChannel(),
                 result.name()
         );
+        fallbackRouter.attemptFallback(e);
     }
 }
 

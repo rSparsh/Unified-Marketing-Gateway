@@ -38,5 +38,7 @@ public class DeliveryStateEntity {
 
     private long createdAtEpochMillis;
     private Long updatedAtEpochMillis;
+    private Boolean fallbackTriggered;
+    private String fallbackChannel;
 }
 
