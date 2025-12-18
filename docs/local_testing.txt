@@ -1,0 +1,10 @@
+Note:
+1. The "mediaTypeList" element accepts only the following values: "TEXT", "IMAGE" & "VIDEO" as parameters.
+    You can paste any of these values, single or multiple, but non-repetitive.
+2. For "TEXT" --> "textMessage" field is mandatory.
+3. For "IMAGE" --> "imageUrl" & "imageCaption" are mandatory.
+3. For "VIDEO" --> "videoUrl" & "videoCaption" are mandatory.
+4. For all requests, "recipientList" must be non-empty and max of 100 chatIDs are permitted in 1 request.
+5. The ClientType header accepts either of the 3 values: TELEGRAM, WHATSAPP OR SMS. Set this header according to your respective target channel.
+
+##Download & import the Unified-Marketing-Gateway-Sample.postman_collection.json to postman
