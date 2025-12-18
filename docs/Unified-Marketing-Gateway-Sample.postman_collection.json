@@ -1,0 +1,88 @@
+{
+	"info": {
+		"_postman_id": "425b4512-76a2-485c-a975-7ce681a2b663",
+		"name": "Unified-Marketing-Gateway-Sample",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "37980841"
+	},
+	"item": [
+		{
+			"name": "sendNotification",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "ClientType",
+						"value": "<PUT EITHER  TELEGRAM/WHATSAPP/SMS>",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"mediaTypeList\": [],\r\n    \"textMessage\": \"<PASTE YOUR TEXT MESSAGE>\",\r\n    \"imageUrl\": \"<PASTE YOUR IMAGE URL>\",\r\n    \"imageCaption\": \"<PASTE YOUR IMAGE CAPTION>\",\r\n    \"videoUrl\": \"<PASTE YOUR VIDEO URL>\",\r\n    \"videoCaption\": \"<PASTE YOUR VIDEO CAPTION>\",\r\n    \"recipientList\": []\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/sendNotification",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"sendNotification"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Webhook status",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/whatsapp/status/<PUT_THE_MESSAGE_ID>",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"whatsapp",
+						"status",
+						"<PUT_THE_MESSAGE_ID>"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "DeliveryStatus",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/status/<PUT THE REQUEST-ID FROM sendNotification RESPONSE>",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"status",
+						"<PUT THE REQUEST-ID FROM sendNotification RESPONSE>"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -1,155 +1,151 @@
 <h1 align="center">🚀 Unified Marketing Gateway</h1>
 
-A reactive, extensible backend platform for multi-channel ad broadcasting.
+A **reactive, state-driven backend platform** for reliable multi-channel message delivery with idempotency, delivery tracking, reconciliation, and fallback routing.
+
+---
 
 ## 📌 Overview
 
-Unified Marketing Gateway is a backend system that enables businesses to broadcast marketing messages across multiple communication platforms (Telegram, WhatsApp, SMS, Email, etc.) through a single unified API.
+**Unified Marketing Gateway** is a backend system that enables broadcasting marketing or notification messages across multiple communication channels—**Telegram, WhatsApp, and SMS (Twilio)**—through a single unified API.
 
-The system is designed with reactive, scalable, rate-limited, and fault-tolerant pipelines, allowing safe and controlled fan-out of outbound marketing requests.
+The system is designed to handle **high fan-out workloads** safely using:
+- reactive, non-blocking execution
+- strict idempotency guarantees
+- delivery state tracking
+- webhook-driven updates
+- reconciliation for eventual consistency
+- state-driven fallback routing
 
-The project is currently in progress.
-Phase 1 implements the Telegram broadcast flow using Spring WebFlux.
+Rather than being a simple message sender, the platform behaves like a **reliable notification delivery system** that remains correct under retries, concurrency, webhook duplication, and partial failures.
 
-## 🎯 Current Features (Phase 1 — Telegram Integration)
-✔ Reactive Pipeline for Outbound Requests
+---
 
-Built using Spring WebFlux with fully non-blocking flows.
+## 🎯 Key Features
 
-✔ Async, High-Throughput Execution
+### ✔ Unified Multi-Channel API
+Send notifications to multiple recipients across:
+- **Telegram**
+- **WhatsApp (Cloud API)**
+- **SMS (Twilio)**
 
-Uses Flux pipelines to process multiple requests concurrently without thread starvation.
+All channels are triggered via a single request model and processor pipeline.
 
-✔ Rate-Limited Execution
+---
 
-Custom reactive rate-limiter ensures controlled outbound API calls, preventing provider throttling.
+### ✔ Reactive, Non-Blocking Execution
+- Built using **Spring WebFlux**
+- Uses **Flux / Mono** pipelines for async fan-out
+- Supports controlled concurrency without thread starvation
 
-✔ Automatic Retries with Exponential Backoff
+---
 
-Handles transient failures (timeouts, 5xx responses) with a reactive retry strategy and backoff logic.
+### ✔ Strong Idempotency Guarantees
+- Database-backed idempotency using a composite key:
+- Prevents duplicate sends across:
+- retries
+- concurrent requests
+- fallback routing
+- webhook replays
 
-✔ Structured Flow
+---
 
-Request execution pipeline includes:
+### ✔ Delivery State Machine
+Each message follows a tracked lifecycle:
+- Channel-aware state transitions
+- Telegram / SMS stop at SENT
+- WhatsApp supports full lifecycle via webhooks
 
-Validation layer
+---
 
-Payload builder
+### ✔ Webhook Processing (WhatsApp)
+- Idempotent webhook handling
+- Safe against duplicate and out-of-order events
+- Monotonic state transitions enforced using precedence rules
+- Provider message ID (`wamid`) used as the external correlation key
 
-Rate-limiter
+---
 
-Async WebClient executor
+### ✔ Reconciliation for Eventual Consistency
+- Scheduled reconciliation job detects messages stuck in:
+    - QUEUED
+    - SENT
+    - DELIVERED
+- Helps identify:
+    - missing webhooks
+    - provider delays
+    - execution gaps
+- Enables safe recovery and observability without blind retries
 
-Retry & fallback handling
+---
 
-✔ Clean, Extensible Design
+### ✔ State-Driven Fallback Routing
+- Automatic fallback from **WhatsApp → SMS**
+- Triggered only when delivery state indicates failure or prolonged staleness
+- Guaranteed at-most-once fallback per recipient
+- Fully idempotent and auditable
 
-The system is structured to easily add integrations for:
+---
 
-WhatsApp
+### ✔ Metrics & Observability
+- Prometheus-compatible metrics via **Micrometer**
+- Tracks:
+    - send attempts
+    - successes / failures
+    - in-flight requests
+    - latency
+    - reconciliation events
+    - fallback executions
 
-SMS gateways
+---
 
-Email services
+### ✔ Persistent Storage (H2 / JPA)
+- JPA-backed persistence for:
+    - idempotency records
+    - delivery state
+    - SMS message tracking
+- H2 used for simplicity and local development
+- Easily portable to Postgres / MySQL
 
-Push notification platforms
+---
 
 ## 🛠 Tech Stack
-Component	Technology
-Language	Java 17
-Framework	Spring Boot (WebFlux)
-Concurrency	Project Reactor (Flux/Mono)
-HTTP Client	WebClient
-Build Tool	Maven/Gradle
-Deployment	(Planned) Docker + Kubernetes
-Future Plans	Redis rate-limiter, Kafka event ingestion
+
+| Component | Technology |
+|---------|-----------|
+| Language | Java 17 |
+| Framework | Spring Boot (WebFlux) |
+| Reactive | Project Reactor (Flux / Mono) |
+| HTTP Client | WebClient |
+| Persistence | Spring Data JPA + H2 |
+| Messaging APIs | Telegram Bot API, WhatsApp Cloud API, Twilio SMS |
+| Metrics | Micrometer + Prometheus |
+| Build Tool | Maven |
+
+---
 
 ## 🧱 System Design
 
-![Unified Marketing Gateway – System Design](docs/system_design.svg)
+[//]: # (![Unified Marketing Gateway – System Design]&#40;docs/system-design.png&#41;)
+<img src="docs/system-design.png" alt="Alt text" width="700" height="400">
 
-## 🚧 Roadmap
-🔹 Phase 2 (Upcoming)
-
-WhatsApp integration
-
-SMS provider integration
-
-Unified error/response model
-
-Platform-level rate limits
-
-🔹 Phase 3
-
-Kafka ingestion for bulk event-driven campaigns
-
-Dashboard APIs
-
-Per-tenant rate limits
-
-Dynamic workflow configuration
-
-🔹 Phase 4
-
-End-to-end multi-channel campaign automation
-
-Analytics & delivery metrics
-
-Rule-engine for intelligent routing
+---
 
 ## 🚀 Getting Started
-
-### 🛠️ Prerequisites
-- **JDK 17**: Ensure you have Java Development Kit 17 installed.
-- **Maven 3.9.x**: Install Apache Maven version 3.9.x. Verify with `mvn -v`.
+[Refer to the Getting Started Wiki](docs/GettingStarted.md)
 
 ---
-
-### 📦 Setup Instructions
-
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/rSparsh/Unified-Marketing-Gateway
-   cd Unified-Marketing-Gateway
-   ```
-
-2. **Create Secrets File**  
-   Follow the steps mentioned in the application-secrets.example.yaml file to create your own secrets file.
-   Edit `application-secrets.yaml` to include your configuration (e.g., API keys, database credentials).
-
-
-3. **Build the Project**  
-   Run the Maven build to compile and package the application:
-   ```bash
-   mvn clean install
-   ```
-
-4. **Run the Application**  
-   Execute the main class `UnifiedMarketingGatewayApplication` using your IDE or via the command line:
-   ```bash
-   mvn spring-boot:run
-   ```
-   *(If using an IDE, locate the `UnifiedMarketingGatewayApplication` class and run it as a Java application.)*
-
-5. **Test with Postman**
-    - Import the sample curl commands from `docs/sample-curl.txt` into Postman.
-    - Replace placeholders in the imported requests with your real values.
-    - Send the requests and validate the responses.
-
----
-
-### 📌 Notes
-- Ensure `application-secrets.yaml` is placed in the correct directory (e.g., `src/main/resources` if using Spring Boot).
-- If encountering build issues, verify your JDK and Maven versions match the requirements.
-
 
 ## 🤝 Contributions
 
-Since this is a personal development project, contributions are welcome via pull requests or suggestions through issues.
+This is a personal engineering project focused on system design and reliability.
+Suggestions, discussions, and pull requests are welcome.
+
+---
 
 ## 📬 Contact
 
 Author: Sparsh Raj
+
 GitHub: https://github.com/rSparsh
 
 Email: sparshraj6a@gmail.com
