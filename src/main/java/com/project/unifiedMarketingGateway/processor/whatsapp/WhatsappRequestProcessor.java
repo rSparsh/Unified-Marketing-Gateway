@@ -76,21 +76,22 @@ public class WhatsappRequestProcessor implements RequestProcessorInterface {
     @Autowired ObjectMapper objectMapper;
 
     @Override
-    public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest request) {
-        List<String> errors = requestValidator.validateSendNotificationRequest(request);
+    public SendNotificationResponse processNotificationRequest(@NonNull SendNotificationRequest sendNotificationRequest) {
+        List<String> errors = requestValidator.validateSendNotificationRequest(sendNotificationRequest);
         if (!errors.isEmpty()) {
             return responseBuilder.buildFailureResponse("Request Validation Failed: " + errors, null);
         }
 
-        List<String> recipientList = request.getRecipientList();
-        List<MediaType> mediaTypeList = request.getMediaTypeList();
+        List<String> recipientList = sendNotificationRequest.getRecipientList();
+        List<MediaType> mediaTypeList = sendNotificationRequest.getMediaTypeList();
 
-        String textMessage  = request.getTextMessage();
-        String imageUrl     = request.getImageUrl();
-        String imageCaption = request.getImageCaption();
-        String videoUrl     = request.getVideoUrl();
-        String videoCaption = request.getVideoCaption();
-        String requestId = UUID.randomUUID().toString();
+        String textMessage  = sendNotificationRequest.getTextMessage();
+        String imageUrl     = sendNotificationRequest.getImageUrl();
+        String imageCaption = sendNotificationRequest.getImageCaption();
+        String videoUrl     = sendNotificationRequest.getVideoUrl();
+        String videoCaption = sendNotificationRequest.getVideoCaption();
+        String requestId = Optional.ofNullable(sendNotificationRequest.getRequestId())
+                .orElse(UUID.randomUUID().toString());
 
         boolean anyQueued  = false;
         boolean allQueued  = true;

@@ -87,7 +87,8 @@ public class TelegramRequestProcessor implements RequestProcessorInterface {
         String imageCaption = sendNotificationRequest.getImageCaption();
         String videoUrl = sendNotificationRequest.getVideoUrl();
         String videoCaption = sendNotificationRequest.getVideoCaption();
-        String requestId = UUID.randomUUID().toString();
+        String requestId = Optional.ofNullable(sendNotificationRequest.getRequestId())
+                .orElse(UUID.randomUUID().toString());
 
         boolean allQueued = true;
         List<String> mediaDisabledErrorList = new ArrayList<>();

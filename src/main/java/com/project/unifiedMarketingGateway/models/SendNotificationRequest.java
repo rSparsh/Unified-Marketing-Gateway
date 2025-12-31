@@ -13,6 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SendNotificationRequest {
+    String requestId;
     String textMessage;
     String imageUrl;
     String imageCaption;
