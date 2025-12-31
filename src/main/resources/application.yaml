@@ -20,6 +20,25 @@ spring:
     console:
       enabled: false
       path: /h2-console
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    producer:
+      acks: all
+      retries: 3
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        enable:
+          idempotence: true
+    consumer:
+      group-id: marketing-delivery-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
 
 
 #Add only Telegram related configs below this line
@@ -87,3 +106,13 @@ reconciliation:
     queued: 5
     sent: 30
     delivered: 1440
+
+logging:
+    org.springframework.kafka: WARN
+    org.springframework.kafka.listener: WARN
+    org.springframework.kafka.KafkaMessageListenerContainer: WARN
+    org.apache.kafka: WARN
+    org.apache.kafka.clients.consumer: WARN
+    org.apache.kafka.clients.producer: WARN
+    org.apache.kafka.common.metrics: ERROR
+    org.apache.kafka.common.network: ERROR

@@ -66,7 +66,8 @@ public class SmsRequestProcessor implements RequestProcessorInterface {
 
         List<String> recipientList = sendNotificationRequest.getRecipientList();
         String textMessage = sendNotificationRequest.getTextMessage();
-        String requestId = UUID.randomUUID().toString();
+        String requestId = Optional.ofNullable(sendNotificationRequest.getRequestId())
+                .orElse(UUID.randomUUID().toString());
 
         boolean allQueued = false;
         List<String> mediaDisabledErrorList = new ArrayList<>();
